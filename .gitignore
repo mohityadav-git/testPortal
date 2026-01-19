@@ -2,3 +2,5 @@
 **/build/
 **/.env
 **/.env.*
+server/uploads/*
+!server/uploads/.gitkeep
