@@ -1466,6 +1466,13 @@ a {
   background: rgba(255, 255, 255, 0.92);
 }
 
+.table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .table tbody tr td:first-child {
   border-top-left-radius: 12px;
   border-bottom-left-radius: 12px;
@@ -1658,6 +1665,19 @@ a {
 
 .form-grid input:focus,
 .form-grid select:focus {
+  outline: none;
+  border-color: var(--turquoise);
+  box-shadow: 0 0 0 3px rgba(24, 184, 181, 0.25);
+}
+
+.question-search-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.question-search-input:focus {
   outline: none;
   border-color: var(--turquoise);
   box-shadow: 0 0 0 3px rgba(24, 184, 181, 0.25);

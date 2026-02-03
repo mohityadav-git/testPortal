@@ -1,33 +1,36 @@
 const express = require("express");
 const router = express.Router();
-const { pool, sql, poolConnect } = require("../config/db");
+const { sql, getPool } = require("../config/db");
 
-// Get all tests
+/* ---------------- GET all tests ---------------- */
 router.get("/", async (req, res) => {
   try {
-    await poolConnect;
-    const result = await pool
-      .request()
-      .query(
-        "SELECT Id, Subject, ClassName, SubjectsJson, QuestionIdsJson, Date, Time, StartAt, EndAt, LinkExpiresAt, DurationMinutes, NumQuestions, ShuffleQuestions, ShuffleOptions, Type, Difficulty, Status FROM Tests"
-      );
-    const mapped = result.recordset.map((row) => {
+    const pool = await getPool();
+    const result = await pool.request().query(`
+      SELECT
+        Id, Subject, ClassName, SubjectsJson, QuestionIdsJson,
+        Date, Time, StartAt, EndAt, LinkExpiresAt,
+        DurationMinutes, NumQuestions,
+        ShuffleQuestions, ShuffleOptions,
+        Type, Difficulty, Status
+      FROM Tests
+    `);
+
+    const mapped = (result.recordset || []).map((row) => {
       let subjects = [];
+      let questionIds = [];
+
       if (row.SubjectsJson) {
         try {
           subjects = JSON.parse(row.SubjectsJson) || [];
-        } catch {
-          subjects = [];
-        }
+        } catch {}
       }
-      let questionIds = [];
       if (row.QuestionIdsJson) {
         try {
           questionIds = JSON.parse(row.QuestionIdsJson) || [];
-        } catch {
-          questionIds = [];
-        }
+        } catch {}
       }
+
       return {
         Id: row.Id,
         Subject: row.Subject,
@@ -48,6 +51,7 @@ router.get("/", async (req, res) => {
         Status: row.Status,
       };
     });
+
     res.json(mapped);
   } catch (err) {
     console.error("Error fetching tests", err);
@@ -55,7 +59,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Create a test
+/* ---------------- CREATE test ---------------- */
 router.post("/", async (req, res) => {
   const {
     subject,
@@ -75,15 +79,25 @@ router.post("/", async (req, res) => {
     linkExpiresAt,
     questionIds = [],
   } = req.body || {};
+
   if (!subject || !className || !date || !time) {
-    return res.status(400).json({ error: "subject, className, date, time are required" });
+    return res
+      .status(400)
+      .json({ error: "subject, className, date, time are required" });
   }
+
+  const subjectsJson =
+    Array.isArray(subjects) && subjects.length
+      ? JSON.stringify(subjects)
+      : null;
+
+  const questionIdsJson =
+    Array.isArray(questionIds) && questionIds.length
+      ? JSON.stringify(questionIds)
+      : null;
+
   try {
-    await poolConnect;
-    const subjectsJson =
-      Array.isArray(subjects) && subjects.length > 0 ? JSON.stringify(subjects) : null;
-    const questionIdsJson =
-      Array.isArray(questionIds) && questionIds.length > 0 ? JSON.stringify(questionIds) : null;
+    const pool = await getPool();
     const result = await pool
       .request()
       .input("Subject", sql.NVarChar(200), subject)
@@ -103,30 +117,48 @@ router.post("/", async (req, res) => {
       .input("Difficulty", sql.NVarChar(50), difficulty || "Easy")
       .input("Status", sql.NVarChar(50), status || "Scheduled")
       .query(`
-        INSERT INTO Tests (Subject, ClassName, SubjectsJson, QuestionIdsJson, Date, Time, StartAt, EndAt, LinkExpiresAt, DurationMinutes, NumQuestions, ShuffleQuestions, ShuffleOptions, Type, Difficulty, Status)
+        INSERT INTO Tests
+        (Subject, ClassName, SubjectsJson, QuestionIdsJson, Date, Time,
+         StartAt, EndAt, LinkExpiresAt,
+         DurationMinutes, NumQuestions,
+         ShuffleQuestions, ShuffleOptions,
+         Type, Difficulty, Status)
         OUTPUT INSERTED.Id
-        VALUES (@Subject, @ClassName, @SubjectsJson, @QuestionIdsJson, @Date, @Time, @StartAt, @EndAt, @LinkExpiresAt, @DurationMinutes, @NumQuestions, @ShuffleQuestions, @ShuffleOptions, @Type, @Difficulty, @Status)
+        VALUES
+        (@Subject, @ClassName, @SubjectsJson, @QuestionIdsJson, @Date, @Time,
+         @StartAt, @EndAt, @LinkExpiresAt,
+         @DurationMinutes, @NumQuestions,
+         @ShuffleQuestions, @ShuffleOptions,
+         @Type, @Difficulty, @Status)
       `);
-    const insertedId = result.recordset?.[0]?.Id;
-    res.status(201).json({ message: "Test created", id: insertedId });
+
+    res.status(201).json({
+      message: "Test created",
+      id: result.recordset?.[0]?.Id,
+    });
   } catch (err) {
     console.error("Error creating test", err);
     res.status(500).json({ error: "Failed to create test" });
   }
 });
 
-// Update test status
+/* ---------------- UPDATE test status ---------------- */
 router.patch("/:id/status", async (req, res) => {
   const { id } = req.params;
   const { status } = req.body || {};
-  if (!status) return res.status(400).json({ error: "status is required" });
+
+  if (!status) {
+    return res.status(400).json({ error: "status is required" });
+  }
+
   try {
-    await poolConnect;
+    const pool = await getPool();
     await pool
       .request()
       .input("Id", sql.Int, Number(id))
       .input("Status", sql.NVarChar(50), status)
       .query("UPDATE Tests SET Status = @Status WHERE Id = @Id");
+
     res.json({ message: "Status updated" });
   } catch (err) {
     console.error("Error updating test status", err);

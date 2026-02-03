@@ -1,4 +1,5 @@
 import React from "react";
+import { toDangerousHtml } from "../../utils/textFormat";
 
 function TeacherResultsPanel({
   isResultsLoading,
@@ -161,7 +162,12 @@ function TeacherResultsPanel({
             <ul className="question-list">
               {parseAnswers(selectedResult.answers).map((a, idx) => (
                 <li key={`${selectedResult.id}-ans-${idx}`} style={{ display: "grid", gap: 6 }}>
-                  <div style={{ fontWeight: 700 }}>Q{idx + 1}: {a.question || a.QuestionText || "-"}</div>
+                  <div style={{ fontWeight: 700 }}>
+                    Q{idx + 1}:{" "}
+                    <span
+                      dangerouslySetInnerHTML={toDangerousHtml(a.question || a.QuestionText || "-")}
+                    />
+                  </div>
                   {Array.isArray(a.options) && a.options.length > 0 ? (
                     <ul className="question-list" style={{ margin: 0 }}>
                       {a.options.map((opt, optIdx) => {
@@ -180,7 +186,7 @@ function TeacherResultsPanel({
                             }}
                           >
                             <span>{optIdx + 1}.</span>
-                            <span>{label}</span>
+                            <span dangerouslySetInnerHTML={toDangerousHtml(label)} />
                             {isSelected && <span className="section-sub">(selected)</span>}
                             {!isSelected && isCorrect && <span className="section-sub">(correct)</span>}
                             {isSelected && isCorrect && <span className="section-sub">(correct)</span>}

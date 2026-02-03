@@ -55,11 +55,11 @@ function TeacherMaterialsPanel({
           </select>
         </label>
         <label style={{ gridColumn: "1 / -1" }}>
-          <span>Upload file (PDF or Word)</span>
+          <span>Upload file (PDF, Word, or video up to 2 GB)</span>
           <input
             key={materialFileKey}
             type="file"
-            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,video/*"
             onChange={(e) => setMaterialFile(e.target.files?.[0] || null)}
           />
         </label>

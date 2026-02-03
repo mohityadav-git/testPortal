@@ -1,47 +1,55 @@
 const express = require("express");
 const router = express.Router();
-const { pool, sql, poolConnect } = require("../config/db");
+const { sql, getPool } = require("../config/db");
 
-// Get questions by subject/class (optional filters)
+/* ---------------- GET questions ---------------- */
 router.get("/", async (req, res) => {
   const { subject, className, ids } = req.query;
+
   let query =
     "SELECT Id, Subject, ClassName, QuestionText, Section, Marks, OptionsJson, CorrectIndex, Difficulty, ImageUrl FROM Questions";
+
   const filters = [];
-  if (subject) filters.push(`Subject = @Subject`);
-  if (className) filters.push(`ClassName = @ClassName`);
-  const hasIdsParam = ids !== undefined && ids !== null && String(ids).trim() !== "";
+
+  if (subject) filters.push("Subject = @Subject");
+  if (className) filters.push("ClassName = @ClassName");
+
+  const hasIdsParam = ids !== undefined && String(ids).trim() !== "";
   const idList = hasIdsParam
     ? String(ids)
         .split(",")
-        .map((val) => Number(String(val).trim()))
-        .filter((val) => Number.isFinite(val))
+        .map((v) => Number(v.trim()))
+        .filter(Number.isFinite)
     : [];
+
   if (hasIdsParam && idList.length === 0) {
     return res.json([]);
   }
-  if (idList.length > 0) {
-    const tokens = idList.map((_, idx) => `@Id${idx}`);
-    filters.push(`Id IN (${tokens.join(", ")})`);
+
+  if (idList.length) {
+    filters.push(
+      `Id IN (${idList.map((_, i) => `@Id${i}`).join(", ")})`
+    );
   }
+
   if (filters.length) query += " WHERE " + filters.join(" AND ");
 
   try {
-    await poolConnect;
+    const pool = await getPool();
     const request = pool.request();
+
     if (subject) request.input("Subject", sql.NVarChar(200), subject);
     if (className) request.input("ClassName", sql.NVarChar(50), className);
-    idList.forEach((id, idx) => {
-      request.input(`Id${idx}`, sql.Int, id);
-    });
+    idList.forEach((id, i) => request.input(`Id${i}`, sql.Int, id));
+
     const result = await request.query(query);
-    const mapped = result.recordset.map((row) => {
+
+    const mapped = (result.recordset || []).map((row) => {
       let options = [];
       if (row.OptionsJson) {
         try {
           options = JSON.parse(row.OptionsJson) || [];
-        } catch (err) {
-          console.warn("Could not parse OptionsJson", err?.message);
+        } catch {
           options = [];
         }
       }
@@ -58,6 +66,7 @@ router.get("/", async (req, res) => {
         ImageUrl: row.ImageUrl,
       };
     });
+
     res.json(mapped);
   } catch (err) {
     console.error("Error fetching questions", err);
@@ -65,7 +74,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Create a question
+/* ---------------- CREATE question ---------------- */
 router.post("/", async (req, res) => {
   const {
     subject,
@@ -78,19 +87,23 @@ router.post("/", async (req, res) => {
     imageUrl = null,
     marks = 1,
   } = req.body || {};
+
   if (!subject || !className || !questionText) {
-    return res.status(400).json({ error: "subject, className, questionText are required" });
+    return res
+      .status(400)
+      .json({ error: "subject, className, questionText are required" });
   }
 
   const optionsJson =
-    Array.isArray(options) && options.length > 0 ? JSON.stringify(options) : null;
+    Array.isArray(options) && options.length ? JSON.stringify(options) : null;
+
   const safeCorrectIndex =
-    Array.isArray(options) && options.length > 0
+    optionsJson !== null
       ? Math.min(Math.max(Number(correctIndex) || 0, 0), options.length - 1)
       : null;
 
   try {
-    await poolConnect;
+    const pool = await getPool();
     await pool
       .request()
       .input("Subject", sql.NVarChar(200), subject)
@@ -103,9 +116,12 @@ router.post("/", async (req, res) => {
       .input("CorrectIndex", sql.Int, safeCorrectIndex)
       .input("Difficulty", sql.NVarChar(50), difficulty || "Easy")
       .query(`
-        INSERT INTO Questions (Subject, ClassName, QuestionText, Section, ImageUrl, Marks, OptionsJson, CorrectIndex, Difficulty)
-        VALUES (@Subject, @ClassName, @QuestionText, @Section, @ImageUrl, @Marks, @OptionsJson, @CorrectIndex, @Difficulty)
+        INSERT INTO Questions
+        (Subject, ClassName, QuestionText, Section, ImageUrl, Marks, OptionsJson, CorrectIndex, Difficulty)
+        VALUES
+        (@Subject, @ClassName, @QuestionText, @Section, @ImageUrl, @Marks, @OptionsJson, @CorrectIndex, @Difficulty)
       `);
+
     res.status(201).json({ message: "Question created" });
   } catch (err) {
     console.error("Error creating question", err);
@@ -113,31 +129,37 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Update a question (difficulty/marks/section)
+/* ---------------- UPDATE question ---------------- */
 router.patch("/:id", async (req, res) => {
   const { id } = req.params;
   const { difficulty, marks, section } = req.body || {};
+
   const updates = [];
   if (difficulty !== undefined) updates.push("Difficulty = @Difficulty");
   if (marks !== undefined) updates.push("Marks = @Marks");
   if (section !== undefined) updates.push("Section = @Section");
-  if (updates.length === 0) {
-    return res.status(400).json({ error: "No updatable fields provided" });
+
+  if (!updates.length) {
+    return res
+      .status(400)
+      .json({ error: "No updatable fields provided" });
   }
 
   try {
-    await poolConnect;
+    const pool = await getPool();
     const request = pool.request().input("Id", sql.Int, Number(id));
-    if (difficulty !== undefined) {
+
+    if (difficulty !== undefined)
       request.input("Difficulty", sql.NVarChar(50), difficulty || "Easy");
-    }
-    if (marks !== undefined) {
+    if (marks !== undefined)
       request.input("Marks", sql.Int, Number(marks) || 1);
-    }
-    if (section !== undefined) {
+    if (section !== undefined)
       request.input("Section", sql.NVarChar(200), section || null);
-    }
-    await request.query(`UPDATE Questions SET ${updates.join(", ")} WHERE Id = @Id`);
+
+    await request.query(
+      `UPDATE Questions SET ${updates.join(", ")} WHERE Id = @Id`
+    );
+
     res.json({ message: "Question updated" });
   } catch (err) {
     console.error("Error updating question", err);
@@ -145,12 +167,17 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
-// Delete a question
+/* ---------------- DELETE question ---------------- */
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
+
   try {
-    await poolConnect;
-    await pool.request().input("Id", sql.Int, Number(id)).query("DELETE FROM Questions WHERE Id = @Id");
+    const pool = await getPool();
+    await pool
+      .request()
+      .input("Id", sql.Int, Number(id))
+      .query("DELETE FROM Questions WHERE Id = @Id");
+
     res.json({ message: "Question deleted" });
   } catch (err) {
     console.error("Error deleting question", err);

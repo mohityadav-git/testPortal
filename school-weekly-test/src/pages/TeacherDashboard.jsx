@@ -66,6 +66,14 @@ function TeacherDashboard() {
   const [optionCImage, setOptionCImage] = useState(null);
   const [optionDImage, setOptionDImage] = useState(null);
   const [correctOption, setCorrectOption] = useState("A");
+  const [editingQuestionId, setEditingQuestionId] = useState(null);
+  const [existingQuestionImageUrls, setExistingQuestionImageUrls] = useState([]);
+  const [existingOptionImageUrls, setExistingOptionImageUrls] = useState({
+    A: null,
+    B: null,
+    C: null,
+    D: null,
+  });
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedResult, setSelectedResult] = useState(null);
   const [questionImages, setQuestionImages] = useState([]);
@@ -97,13 +105,6 @@ function TeacherDashboard() {
       setMaterialClass(teacherClass);
     }
   }, [teacherClass]);
-
-  useEffect(() => {
-    if (questionPicking === "manual") {
-      setTestDifficulty("Easy");
-      setSelectedQuestionIds([]);
-    }
-  }, [questionPicking]);
 
   useEffect(() => {
     if (questionPicking === "manual") {
@@ -258,13 +259,8 @@ function TeacherDashboard() {
 
   const eligibleQuestions = useMemo(() => {
     if (questionPicking !== "manual") return [];
-    let list = filteredQuestions;
-    if (testSubject && testSubject !== "All Subjects") {
-      const subjectKey = testSubject.trim().toLowerCase();
-      list = list.filter((q) => (q.subject || "").trim().toLowerCase() === subjectKey);
-    }
-    return list;
-  }, [filteredQuestions, questionPicking, testSubject]);
+    return filteredQuestions;
+  }, [filteredQuestions, questionPicking]);
 
   const filteredResults = useMemo(() => {
     if (!teacherClass) return results;
@@ -390,7 +386,10 @@ function TeacherDashboard() {
 
   const handleCreateQuestion = async (e) => {
     e.preventDefault();
-    if (!questionSubject || !questionClass || !questionText) return;
+    if (!questionSubject || !questionClass || !questionText) {
+      setQuestionsError("Subject, class, and question text are required");
+      return;
+    }
     const indexMap = { A: 0, B: 1, C: 2, D: 3 };
     const optionEntries = [
       { key: "A", text: optionA, file: optionAImage },
@@ -483,6 +482,174 @@ function TeacherDashboard() {
     }
   };
 
+  const parseQuestionImages = (imageUrl) => {
+    if (!imageUrl) return [];
+    if (Array.isArray(imageUrl)) return imageUrl.filter(Boolean);
+    if (typeof imageUrl === "string") {
+      try {
+        const parsed = JSON.parse(imageUrl);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      } catch {
+        return [imageUrl];
+      }
+      return [imageUrl];
+    }
+    return [];
+  };
+
+  const startEditQuestion = (question) => {
+    if (!question) return;
+    setEditingQuestionId(question.id);
+    setQuestionSubject(question.subject || "");
+    setQuestionClass(question.className || "");
+    setQuestionText(question.questionText || "");
+    setQuestionSection(question.section || "");
+    setQuestionMarks(question.marks || 1);
+    setQuestionDifficulty(question.difficulty || "Easy");
+    const options = Array.isArray(question.options) ? question.options : [];
+    setOptionA(options[0]?.text || "");
+    setOptionB(options[1]?.text || "");
+    setOptionC(options[2]?.text || "");
+    setOptionD(options[3]?.text || "");
+    setOptionAImage(null);
+    setOptionBImage(null);
+    setOptionCImage(null);
+    setOptionDImage(null);
+    setQuestionImages([]);
+    const optionImageMap = {
+      A: options[0]?.imageUrl || null,
+      B: options[1]?.imageUrl || null,
+      C: options[2]?.imageUrl || null,
+      D: options[3]?.imageUrl || null,
+    };
+    setExistingOptionImageUrls(optionImageMap);
+    setExistingQuestionImageUrls(parseQuestionImages(question.imageUrl));
+    const indexToLetter = ["A", "B", "C", "D"];
+    const mapped = indexToLetter[Number(question.correctIndex)] || "A";
+    setCorrectOption(mapped);
+    setQuestionsError(null);
+  };
+
+  const resetQuestionForm = () => {
+    setQuestionText("");
+    setQuestionSection("");
+    setQuestionMarks(1);
+    setQuestionDifficulty("Easy");
+    setOptionA("");
+    setOptionB("");
+    setOptionC("");
+    setOptionD("");
+    setCorrectOption("A");
+    setOptionAImage(null);
+    setOptionBImage(null);
+    setOptionCImage(null);
+    setOptionDImage(null);
+    setQuestionImages([]);
+    setExistingQuestionImageUrls([]);
+    setExistingOptionImageUrls({ A: null, B: null, C: null, D: null });
+  };
+
+  const cancelEditQuestion = () => {
+    setEditingQuestionId(null);
+    resetQuestionForm();
+  };
+
+  const handleUpdateQuestion = async (e) => {
+    e.preventDefault();
+    if (!editingQuestionId) return;
+    if (!questionSubject || !questionClass || !questionText) {
+      setQuestionsError("Subject, class, and question text are required");
+      return;
+    }
+    const indexMap = { A: 0, B: 1, C: 2, D: 3 };
+    const optionEntries = [
+      { key: "A", text: optionA, file: optionAImage, existing: existingOptionImageUrls.A },
+      { key: "B", text: optionB, file: optionBImage, existing: existingOptionImageUrls.B },
+      { key: "C", text: optionC, file: optionCImage, existing: existingOptionImageUrls.C },
+      { key: "D", text: optionD, file: optionDImage, existing: existingOptionImageUrls.D },
+    ];
+    const optionsWithContent = optionEntries.filter(
+      (entry) => String(entry.text || "").trim() || entry.file || entry.existing
+    );
+    if (optionsWithContent.length < 2) {
+      setQuestionsError("Add at least two options");
+      return;
+    }
+    const selectedIndex = optionsWithContent.findIndex((entry) => entry.key === correctOption);
+    if (selectedIndex === -1) {
+      setQuestionsError("Correct option must have text or an image");
+      return;
+    }
+    let optionImageUrls = {};
+    let imageUrl = null;
+    if (questionImages.length > 0 || optionsWithContent.some((entry) => entry.file)) {
+      setIsQuestionImageUploading(true);
+      try {
+        if (questionImages.length > 0) {
+          const questionUploads = await Promise.all(
+            questionImages.map((file) => api.uploadImage(file))
+          );
+          const questionUrls = questionUploads.map((res) => res?.url).filter(Boolean);
+          if (questionUrls.length === 1) {
+            imageUrl = questionUrls[0];
+          } else if (questionUrls.length > 1) {
+            imageUrl = JSON.stringify(questionUrls);
+          }
+        }
+        if (optionsWithContent.some((entry) => entry.file)) {
+          const optionUploads = await Promise.all(
+            optionsWithContent.map((entry) =>
+              entry.file ? api.uploadImage(entry.file) : Promise.resolve(null)
+            )
+          );
+          optionImageUrls = optionsWithContent.reduce((acc, entry, idx) => {
+            const uploaded = optionUploads[idx];
+            if (uploaded?.url) {
+              acc[entry.key] = uploaded.url;
+            }
+            return acc;
+          }, {});
+        }
+      } catch (err) {
+        console.warn("Image upload failed", err?.message);
+        setQuestionsError("Could not upload question images");
+        setIsQuestionImageUploading(false);
+        return;
+      }
+      setIsQuestionImageUploading(false);
+    }
+    if (!imageUrl && existingQuestionImageUrls.length > 0) {
+      imageUrl =
+        existingQuestionImageUrls.length === 1
+          ? existingQuestionImageUrls[0]
+          : JSON.stringify(existingQuestionImageUrls);
+    }
+    const options = optionsWithContent.map((entry) => ({
+      text: String(entry.text || "").trim(),
+      imageUrl: optionImageUrls[entry.key] || entry.existing || null,
+    }));
+    try {
+      await api.updateQuestion(editingQuestionId, {
+        subject: questionSubject,
+        className: questionClass,
+        questionText,
+        section: questionSection || null,
+        marks: Number(questionMarks) || 1,
+        difficulty: questionDifficulty,
+        options,
+        correctIndex: selectedIndex,
+        imageUrl,
+      });
+      setQuestionsError(null);
+      setEditingQuestionId(null);
+      resetQuestionForm();
+      loadQuestions();
+    } catch (err) {
+      console.warn("Update question failed", err?.message);
+      setQuestionsError("Could not update question");
+    }
+  };
+
   const handleDeleteQuestion = async (questionId) => {
     if (!questionId) return;
     const ok = window.confirm("Delete this question? This cannot be undone.");
@@ -501,6 +668,10 @@ function TeacherDashboard() {
     e.preventDefault();
     if (!materialSubject || !materialClass || !materialFile) {
       setStudyMaterialsError("Subject, class, and file are required");
+      return;
+    }
+    if (materialFile.size > 2 * 1024 * 1024 * 1024) {
+      setStudyMaterialsError("File size must be 2 GB or less");
       return;
     }
     const formData = new FormData();
@@ -948,13 +1119,14 @@ function TeacherDashboard() {
               setTestNumQuestions={setTestNumQuestions}
               questionPicking={questionPicking}
               setQuestionPicking={setQuestionPicking}
-              testDifficulty={testDifficulty}
-              setTestDifficulty={setTestDifficulty}
-              selectedQuestionIds={selectedQuestionIds}
-              eligibleQuestions={eligibleQuestions}
-              isQuestionsLoading={isQuestionsLoading}
-              toggleQuestionSelection={toggleQuestionSelection}
-              handleCreateTest={handleCreateTest}
+                testDifficulty={testDifficulty}
+                setTestDifficulty={setTestDifficulty}
+                selectedQuestionIds={selectedQuestionIds}
+                eligibleQuestions={eligibleQuestions}
+                filteredQuestions={filteredQuestions}
+                isQuestionsLoading={isQuestionsLoading}
+                toggleQuestionSelection={toggleQuestionSelection}
+                handleCreateTest={handleCreateTest}
               loadTests={loadTests}
               isTestsLoading={isTestsLoading}
               testsError={testsError}
@@ -991,13 +1163,19 @@ function TeacherDashboard() {
               setOptionDImage={setOptionDImage}
               correctOption={correctOption}
               setCorrectOption={setCorrectOption}
+              editingQuestionId={editingQuestionId}
+              existingQuestionImageUrls={existingQuestionImageUrls}
+              existingOptionImageUrls={existingOptionImageUrls}
               isQuestionImageUploading={isQuestionImageUploading}
               handleCreateQuestion={handleCreateQuestion}
+              handleUpdateQuestion={handleUpdateQuestion}
               loadQuestions={loadQuestions}
               isQuestionsLoading={isQuestionsLoading}
               questionsError={questionsError}
               filteredQuestions={filteredQuestions}
               handleDeleteQuestion={handleDeleteQuestion}
+              startEditQuestion={startEditQuestion}
+              cancelEditQuestion={cancelEditQuestion}
             />
           )}
           {activePanel === "materials" && (

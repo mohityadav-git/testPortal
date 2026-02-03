@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { studentMockTests } from "../data/localData";
 import { api } from "../services/api";
+import { toDangerousHtml } from "../utils/textFormat";
 
 const fallbackQuestions = [
   {
@@ -61,6 +62,7 @@ function TestAttempt() {
 
   const [testMeta, setTestMeta] = useState(null);
   const [questions, setQuestions] = useState(fallbackQuestions);
+  const [accessOverride, setAccessOverride] = useState(null);
 
   const resolveImageUrl = (value) => {
     const raw = typeof value === "string" ? value.trim() : "";
@@ -106,6 +108,7 @@ function TestAttempt() {
         const tests = await api.getTests();
         const match = (tests || []).find((t) => String(t.Id) === String(testId) || String(t.id) === String(testId));
         if (mounted && match) {
+          setAccessOverride(null);
           let questionIds = [];
           if (Array.isArray(match.QuestionIds)) {
             questionIds = match.QuestionIds;
@@ -183,7 +186,7 @@ function TestAttempt() {
             .map((val) => Number(val))
             .filter((val) => Number.isFinite(val));
           if (idsFromTest.length > 0) {
-            const qs = await api.getQuestions({ ids: idsFromTest.join(",") });
+            const qs = await api.getQuestions({ ids: idsFromTest.join(","), testId: match.Id || match.id || testId });
             if (mounted && Array.isArray(qs) && qs.length > 0) {
               const mapped = qs.map((q, idx) => ({
                 id: q.Id || idx + 1,
@@ -223,7 +226,12 @@ function TestAttempt() {
             }
           }
           // fetch questions by subject/class
-          const qs = await api.getQuestions({ subject: match.Subject || match.subject, className: match.ClassName || match.className });
+          const qs = await api.getQuestions({
+            subject: match.Subject || match.subject,
+            className: match.ClassName || match.className,
+            difficulty: match.Difficulty || match.difficulty,
+            testId: match.Id || match.id || testId,
+          });
           if (mounted && Array.isArray(qs) && qs.length > 0) {
             const mapped = qs.map((q, idx) => ({
               id: q.Id || idx + 1,
@@ -281,7 +289,15 @@ function TestAttempt() {
           setTestMeta(fallback);
           setQuestions(shuffledFallback);
         }
-      } catch {
+      } catch (err) {
+        if (err?.message) {
+          const msg = String(err.message);
+          if (msg.includes("not started")) {
+            setAccessOverride({ status: "not_started", message: "Stay tuned — test will start soon." });
+          } else if (msg.includes("closed") || msg.includes("expired")) {
+            setAccessOverride({ status: "closed", message: "Test is over." });
+          }
+        }
         if (mounted) {
           const fallback = studentMockTests.find((t) => String(t.id) === String(testId)) || null;
           const shuffledFallback = shuffleArray(fallbackQuestions).map((q) =>
@@ -307,12 +323,44 @@ function TestAttempt() {
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  const attemptKey = useMemo(
+    () => `testAttempt:${testId}:${studentKey}`,
+    [testId, studentKey]
+  );
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(attemptKey) || "null");
+      if (stored?.submitted) {
+        setSubmitted(true);
+        setHasStarted(true);
+      } else if (stored?.started) {
+        setHasStarted(true);
+      }
+    } catch {
+      /* noop */
+    }
+  }, [attemptKey]);
 
   const accessStatus = useMemo(() => {
+    if (accessOverride) return accessOverride;
     if (!testMeta) return { status: "loading", message: "" };
     const now = Date.now();
-    const startAt = testMeta.startAt ? new Date(testMeta.startAt).getTime() : null;
-    const endAt = testMeta.endAt ? new Date(testMeta.endAt).getTime() : null;
+    const fallbackStart =
+      testMeta.date && testMeta.time ? new Date(`${testMeta.date}T${testMeta.time}`) : null;
+    const startAt = testMeta.startAt
+      ? new Date(testMeta.startAt).getTime()
+      : fallbackStart && !Number.isNaN(fallbackStart.getTime())
+        ? fallbackStart.getTime()
+        : null;
+    const durationMinutes = Number(testMeta.durationMinutes || TEST_DURATION_MIN);
+    const endAt = testMeta.endAt
+      ? new Date(testMeta.endAt).getTime()
+      : startAt != null && Number.isFinite(durationMinutes)
+        ? startAt + durationMinutes * 60 * 1000
+        : null;
     const linkExpiry = testMeta.linkExpiresAt
       ? new Date(testMeta.linkExpiresAt).getTime()
       : null;
@@ -320,13 +368,13 @@ function TestAttempt() {
       return { status: "expired", message: "This test link has expired." };
     }
     if (endAt && !Number.isNaN(endAt) && now > endAt) {
-      return { status: "closed", message: "This test window is closed." };
+      return { status: "closed", message: "Test is over." };
     }
     if (startAt && !Number.isNaN(startAt) && now < startAt) {
-      return { status: "not_started", message: "This test has not started yet." };
+      return { status: "not_started", message: "Stay tuned — test will start soon." };
     }
     return { status: "open", message: "" };
-  }, [testMeta, secondsLeft]);
+  }, [testMeta, secondsLeft, accessOverride]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -336,6 +384,17 @@ function TestAttempt() {
       return;
     }
     if (accessStatus.status !== "open") return;
+    if (!hasStarted) {
+      setHasStarted(true);
+      try {
+        localStorage.setItem(
+          attemptKey,
+          JSON.stringify({ started: true, submitted: false, startedAt: new Date().toISOString() })
+        );
+      } catch {
+        /* noop */
+      }
+    }
     if (secondsLeft <= 0) {
       handleSubmit();
       return;
@@ -344,7 +403,30 @@ function TestAttempt() {
       setSecondsLeft((prev) => prev - 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [secondsLeft, submitted, accessStatus.status]);
+  }, [secondsLeft, submitted, accessStatus.status, hasStarted, attemptKey]);
+
+  useEffect(() => {
+    if (submitted) return;
+    if (accessStatus.status !== "open") return;
+    if (!hasStarted) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        handleSubmit(true);
+      }
+    };
+
+    const handleBlur = () => {
+      handleSubmit(true);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [submitted, accessStatus.status, hasStarted]);
 
   const handleChange = (qId, optionIndex) => {
     setAnswers((prev) => ({ ...prev, [qId]: optionIndex }));
@@ -375,7 +457,7 @@ function TestAttempt() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (forced = false) => {
     if (submitted) return;
 
     let sc = 0;
@@ -392,6 +474,21 @@ function TestAttempt() {
     }
     setScore(sc);
     setSubmitted(true);
+    try {
+      const prev = JSON.parse(localStorage.getItem(attemptKey) || "null") || {};
+      localStorage.setItem(
+        attemptKey,
+        JSON.stringify({
+          ...prev,
+          started: true,
+          submitted: true,
+          forced: forced || false,
+          submittedAt: new Date().toISOString(),
+        })
+      );
+    } catch {
+      /* noop */
+    }
 
     const answerSheet = questions.map((q) => ({
       id: q.id,
@@ -583,7 +680,10 @@ function TestAttempt() {
           </div>
 
           <div className="mock-question-card">
-            <p className="mock-question-text">{currentQuestion.question}</p>
+            <p
+              className="mock-question-text"
+              dangerouslySetInnerHTML={toDangerousHtml(currentQuestion.question)}
+            />
             {Array.isArray(currentQuestion.imageUrls) && currentQuestion.imageUrls.length > 0 && (
               <div style={{ marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 10 }}>
                 {currentQuestion.imageUrls.map((src, idx) => (
@@ -623,7 +723,7 @@ function TestAttempt() {
                       />
                       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                         {img && <img src={img} alt={`Option ${idx + 1}`} style={optionImageStyle} />}
-                        <span>{label}</span>
+                        <span dangerouslySetInnerHTML={toDangerousHtml(label)} />
                       </div>
                     </label>
                   );
