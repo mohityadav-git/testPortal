@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { pool, poolConnect, sql } = require("./config/db");
+const { getPool, sql } = require("./config/db");
 
 const testsRouter = require("./routes/tests");
 const questionsRouter = require("./routes/questions");
@@ -18,21 +18,23 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/health", async (_req, res) => {
   try {
-    await poolConnect;
+    const pool = await getPool();
+    await pool.request().query("SELECT 1 AS ok");
     res.json({ status: "ok" });
   } catch (err) {
     res.status(500).json({ status: "error", error: err.message });
   }
 });
 
-app.use("/api/tests", testsRouter);
-app.use("/api/questions", questionsRouter);
-app.use("/api/results", resultsRouter);
-app.use("/api/students", studentsRouter);
-app.use("/api/uploads", uploadsRouter);
-app.use("/api/study-materials", studyMaterialsRouter);
+app.use("/tests", testsRouter);
+app.use("/questions", questionsRouter);
+app.use("/results", resultsRouter);
+app.use("/students", studentsRouter);
+app.use("/uploads", uploadsRouter);
+app.use("/study-materials", studyMaterialsRouter);
 
 const ensureColumn = async (table, column, definition) => {
+  const pool = await getPool();
   const result = await pool
     .request()
     .input("TableName", sql.NVarChar(128), table)
@@ -51,6 +53,7 @@ const ensureColumn = async (table, column, definition) => {
 };
 
 const ensureTable = async (table, createSql) => {
+  const pool = await getPool();
   const result = await pool
     .request()
     .input("TableName", sql.NVarChar(128), table)
@@ -69,7 +72,7 @@ const ensureTable = async (table, createSql) => {
 
 const ensureSchema = async () => {
   try {
-    await poolConnect;
+    await getPool();
     await ensureColumn("Questions", "ImageUrl", "NVARCHAR(MAX) NULL");
     await ensureColumn("Tests", "QuestionIdsJson", "NVARCHAR(MAX) NULL");
     await ensureColumn("Tests", "StartAt", "DATETIME NULL");
