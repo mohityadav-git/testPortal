@@ -46,7 +46,7 @@ const fallbackQuestions = [
 ];
 
 const TEST_DURATION_MIN = 30;
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 const ASSET_BASE = API_BASE.replace(/\/api\/?$/, "");
 
 function TestAttempt() {

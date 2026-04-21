@@ -536,6 +536,13 @@ a {
   padding-bottom: 32px;
   min-height: 100vh;
 }
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari: fixed attachment causes blank bg */
+  .student-page,
+  .teacher-page {
+    background-attachment: scroll;
+  }
+}
 
 .student-dashboard.page-container {
   display: flex;
@@ -2997,4 +3004,423 @@ a {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.7);
   margin-top: 4px;
+}
+
+/* ============================================================
+   MOBILE RESPONSIVE — comprehensive fixes for all phones
+   ============================================================ */
+
+/* Fix iOS background-attachment: fixed (causes blank/jumpy bg) */
+@media (max-width: 1024px) {
+  .student-page,
+  .teacher-page {
+    background-attachment: scroll;
+  }
+}
+
+/* ---- Dashboard body padding on all small screens ---- */
+@media (max-width: 1024px) {
+  .student-page,
+  .teacher-page {
+    padding: 0 8px 24px;
+  }
+
+  .student-body {
+    padding: 8px 0 0;
+    gap: 10px;
+  }
+
+  /* Right panel full-width, no sticky */
+  .right-panel {
+    width: 100%;
+    position: static;
+    max-height: none;
+  }
+
+  /* Cards inside panels shouldn't have huge shadow on mobile */
+  .card {
+    box-shadow: 0 4px 12px rgba(36, 49, 79, 0.08);
+  }
+}
+
+/* ---- Tablets ≤ 768px ---- */
+@media (max-width: 768px) {
+  /* Dashboard nav: shrink brand text */
+  .dashboard-nav {
+    gap: 8px !important;
+    padding: 8px 10px !important;
+  }
+
+  /* Hero cards: single column, compact padding */
+  .student-hero-card,
+  .teacher-hero-card {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  /* Hero title */
+  .hero-copy h1 {
+    font-size: 22px;
+  }
+
+  /* Hero stats: 2 columns on tablets */
+  .hero-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Forms: force 1-column on small screens */
+  .form-grid,
+  .add-question-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  /* Option pair: stack vertically */
+  .option-pair {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .option-pair input {
+    max-width: 100%;
+  }
+
+  /* Modals: full-width with comfortable padding */
+  .modal-panel {
+    padding: 14px;
+    border-radius: 12px;
+    max-height: 95vh;
+  }
+
+  .modal-panel .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .modal-backdrop {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  /* Tables: ensure horizontal scroll */
+  .table-wrapper,
+  .card > .table,
+  .performance-dashboard .table {
+    overflow-x: auto;
+    display: block;
+  }
+
+  /* Stat values: shrink on small screens */
+  .stat-value {
+    font-size: 20px;
+  }
+
+  /* Section headers: allow wrapping */
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .section-title {
+    font-size: 15px;
+  }
+
+  /* Class grid: 1 column */
+  .class-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Feature/action grids: 1 column */
+  .student-action-grid,
+  .teacher-action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .performance-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Banner: stack */
+  .mock-banner {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .mock-badges {
+    flex-wrap: wrap;
+  }
+}
+
+/* ---- Phones ≤ 480px ---- */
+@media (max-width: 480px) {
+  /* Page outer padding */
+  .student-page,
+  .teacher-page {
+    padding: 0 6px 20px;
+  }
+
+  /* Navbar */
+  .dashboard-nav {
+    border-radius: 8px !important;
+    padding: 7px 8px !important;
+  }
+
+  /* Brand text: hide caption on tiny screens */
+  .brand-caption {
+    display: none;
+  }
+
+  /* Hero card: minimal padding */
+  .student-hero-card,
+  .teacher-hero-card {
+    padding: 12px;
+  }
+
+  .hero-copy h1 {
+    font-size: 18px;
+    margin: 6px 0 4px;
+  }
+
+  /* Stats: 2-col on small phones */
+  .hero-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .hero-stat {
+    padding: 10px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
+
+  /* Cards */
+  .card {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  /* Buttons */
+  .btn {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .btn-sm {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  /* Login: shorter illustration, smaller logo */
+  .login-illustration {
+    min-height: 180px;
+  }
+
+  .login-illustration .login-logo {
+    width: 100px;
+    height: 100px;
+  }
+
+  .login-illustration-title {
+    font-size: 20px;
+  }
+
+  .login-illustration-sub {
+    font-size: 13px;
+  }
+
+  .login-illustration-layout {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .login-panel {
+    padding: 18px 14px;
+    border-radius: 10px;
+    margin: 0;
+  }
+
+  .login-form,
+  .login-toggle {
+    max-width: 100%;
+  }
+
+  /* Test attempt: stack toolbar buttons vertically */
+  .mock-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .mock-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .mock-btn {
+    flex: 1;
+    min-width: 120px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .mock-question-text {
+    font-size: 15px;
+  }
+
+  .mock-layout {
+    padding: 8px 8px 16px;
+    gap: 10px;
+  }
+
+  .mock-sidebar {
+    padding: 8px;
+  }
+
+  .mock-section-title {
+    font-size: 15px;
+    margin: 4px 0;
+  }
+
+  /* Palette: more columns on small screens to save vertical space */
+  .mock-palette {
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+  }
+
+  .mock-palette-btn {
+    padding: 7px 0;
+    font-size: 12px;
+  }
+
+  /* Main question card */
+  .mock-main {
+    padding: 12px;
+  }
+
+  .mock-option-row {
+    padding: 10px 10px;
+    font-size: 14px;
+  }
+
+  /* Tables: compact cells */
+  .table th,
+  .table td {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  /* Modal: full screen feel */
+  .modal-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal-panel {
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+    width: 100%;
+    padding: 16px 14px;
+  }
+
+  /* Tile chip */
+  .action-tile {
+    padding: 12px 10px;
+  }
+
+  /* Question list items */
+  .question-list > li {
+    padding: 10px 12px;
+  }
+
+  /* Section header gap */
+  .section-header {
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  /* Table actions: wrap */
+  .table-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Score trend chart: horizontal scroll */
+  .score-trend-card {
+    overflow-x: auto;
+  }
+
+  /* Dashboard footer */
+  .dashboard-footer {
+    font-size: 12px;
+    padding: 10px;
+  }
+
+  /* Mock banner badges */
+  .mock-badge {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+
+  /* Performance grid */
+  .performance-dashboard {
+    padding: 12px;
+  }
+
+  /* Hero panel */
+  .hero-panel {
+    padding: 12px;
+  }
+}
+
+/* ---- Very small phones ≤ 360px ---- */
+@media (max-width: 360px) {
+  .student-page,
+  .teacher-page {
+    padding: 0 4px 16px;
+  }
+
+  .dashboard-nav {
+    padding: 6px 6px !important;
+  }
+
+  .hero-copy h1 {
+    font-size: 16px;
+  }
+
+  .hero-stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .mock-palette {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  .btn-sm {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .brand-name {
+    font-size: 14px;
+  }
+
+  .card {
+    padding: 10px;
+  }
+
+  .login-illustration {
+    min-height: 140px;
+  }
+
+  .login-illustration .login-logo {
+    width: 80px;
+    height: 80px;
+  }
+
+  .login-illustration-title {
+    font-size: 17px;
+  }
 }

@@ -36,8 +36,9 @@ router.post("/", upload.single("image"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No file uploaded." });
   }
-  const host = `${req.protocol}://${req.get("host")}`;
-  const url = `${host}/uploads/${req.file.filename}`;
+  const URL = `/uploads/${req.file.filename}`;
+  const publicBase = (process.env.PUBLIC_BASE_URL || "").trim().replace(/\/+$/, "");
+  const url = publicBase ? `${publicBase}${URL}` : URL;
   return res.status(201).json({ url });
 });
 
