@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import { api } from "../../services/api";
 
 function TeacherStudentsPanel({
   studentName,
@@ -25,6 +26,26 @@ function TeacherStudentsPanel({
   handleDeleteStudent,
   loadStudents,
 }) {
+  const [settingPasswordId, setSettingPasswordId] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [pwdMsg, setPwdMsg] = useState({ id: null, msg: "", ok: false });
+
+  const handleSetPassword = async (studentId) => {
+    if (!newPassword || newPassword.length < 4) {
+      setPwdMsg({ id: studentId, msg: "Min. 4 characters", ok: false });
+      return;
+    }
+    try {
+      await api.setStudentPassword(studentId, newPassword);
+      setPwdMsg({ id: studentId, msg: "Password set ✅", ok: true });
+      setNewPassword("");
+      setSettingPasswordId(null);
+      setTimeout(() => setPwdMsg({ id: null, msg: "", ok: false }), 3000);
+    } catch (err) {
+      setPwdMsg({ id: studentId, msg: err.message || "Failed", ok: false });
+    }
+  };
+
   return (
     <div className="card">
       <div className="section-header">
@@ -72,6 +93,7 @@ function TeacherStudentsPanel({
           <div className="section-sub">Total: {students.length}</div>
         </div>
       </div>
+
       {isStudentsLoading ? (
         <div className="section-sub">Loading students...</div>
       ) : students.length === 0 ? (
@@ -84,6 +106,7 @@ function TeacherStudentsPanel({
               <th>Class</th>
               <th>Roll</th>
               <th>Mobile</th>
+              <th>Password</th>
               <th></th>
             </tr>
           </thead>
@@ -92,10 +115,7 @@ function TeacherStudentsPanel({
               <tr key={s.Id}>
                 <td>
                   {editingStudentId === s.Id ? (
-                    <input
-                      value={editStudentName}
-                      onChange={(e) => setEditStudentName(e.target.value)}
-                    />
+                    <input value={editStudentName} onChange={(e) => setEditStudentName(e.target.value)} />
                   ) : (
                     s.StudentName
                   )}
@@ -103,24 +123,68 @@ function TeacherStudentsPanel({
                 <td>{s.ClassName}</td>
                 <td>
                   {editingStudentId === s.Id ? (
-                    <input
-                      value={editStudentRoll}
-                      onChange={(e) => setEditStudentRoll(e.target.value)}
-                    />
+                    <input value={editStudentRoll} onChange={(e) => setEditStudentRoll(e.target.value)} />
                   ) : (
                     s.RollNumber || "-"
                   )}
                 </td>
                 <td>
                   {editingStudentId === s.Id ? (
-                    <input
-                      value={editStudentMobile}
-                      onChange={(e) => setEditStudentMobile(e.target.value)}
-                    />
+                    <input value={editStudentMobile} onChange={(e) => setEditStudentMobile(e.target.value)} />
                   ) : (
                     s.MobileNumber || "-"
                   )}
                 </td>
+
+                {/* Password cell */}
+                <td style={{ minWidth: 180 }}>
+                  {settingPasswordId === s.Id ? (
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <input
+                        type="password"
+                        placeholder="New password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        style={{ width: 110, fontSize: 12, padding: "3px 6px" }}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        style={{ fontSize: 11, padding: "3px 8px" }}
+                        onClick={() => handleSetPassword(s.Id)}
+                      >
+                        Set
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        style={{ fontSize: 11, padding: "3px 8px" }}
+                        onClick={() => { setSettingPasswordId(null); setNewPassword(""); setPwdMsg({ id: null, msg: "", ok: false }); }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        style={{ fontSize: 11 }}
+                        onClick={() => { setSettingPasswordId(s.Id); setNewPassword(""); setPwdMsg({ id: null, msg: "", ok: false }); }}
+                      >
+                        Set Password
+                      </button>
+                      {pwdMsg.id === s.Id && (
+                        <span style={{ fontSize: 11, color: pwdMsg.ok ? "#166534" : "#c23" }}>
+                          {pwdMsg.msg}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </td>
+
+                {/* Edit/Delete cell */}
                 <td style={{ whiteSpace: "nowrap" }}>
                   {editingStudentId === s.Id ? (
                     <>

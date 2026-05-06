@@ -53,6 +53,29 @@ router.post("/", async (req, res) => {
     });
   }
 
+  const { evaluateSubjectiveAnswer } = require("../utils/gemini");
+
+  let finalScore = Number(score) || 0;
+  let finalOutOf = Number(outOf) || 0;
+  
+  // Re-calculate or auto-grade if subjective questions exist
+  if (Array.isArray(answers)) {
+    for (const a of answers) {
+      if (a.type === "Subjective" || (a.options && a.options[0]?.isSubjective)) {
+        // Find the ideal answer from the options array
+        const idealAnswer = a.options && a.options[0] ? a.options[0].text : "";
+        const studentAnswer = a.selectedText || "";
+        const questionMarks = Number(a.marks) || 1;
+        
+        const awarded = await evaluateSubjectiveAnswer(a.question, idealAnswer, studentAnswer, questionMarks);
+        a.marksAwarded = awarded; // Save it back to the answer object!
+        
+        finalScore += awarded;
+        finalOutOf += questionMarks;
+      }
+    }
+  }
+
   const safeTestId = testId == null ? null : String(testId).slice(0, 50);
 
   try {
@@ -63,8 +86,8 @@ router.post("/", async (req, res) => {
       .input("StudentName", sql.NVarChar(200), studentName)
       .input("ClassName", sql.NVarChar(50), className)
       .input("Subject", sql.NVarChar(200), subject)
-      .input("Score", sql.Int, Number(score))
-      .input("OutOf", sql.Int, Number(outOf))
+      .input("Score", sql.Int, finalScore)
+      .input("OutOf", sql.Int, finalOutOf)
       .input("SubmittedAt", sql.DateTime, submittedAt || new Date())
       .input(
         "AnswersJson",

@@ -1,6 +1,7 @@
 import React from "react";
-import { Document, Packer, Paragraph, TextRun } from "docx";
+import { jsPDF } from "jspdf";
 import { toDangerousHtml } from "../../utils/textFormat";
+import schoolLogo from "../../assets/saraswati-maa.jpg";
 import {
   classOptions,
   difficultyOptions,
@@ -36,6 +37,7 @@ function TeacherTestsPanel({
   isTestsLoading,
   testsError,
   filteredTests,
+  handleDeleteTest,
 }) {
   const [questionSearch, setQuestionSearch] = React.useState("");
   const [bankSubjectFilter, setBankSubjectFilter] = React.useState("all");
@@ -101,63 +103,138 @@ function TeacherTestsPanel({
       .replace(/\*\*/g, "")
       .replace(/__/g, "");
 
-  const downloadTestDocx = async (test) => {
+  const downloadTestPdf = async (test) => {
     if (!test) return;
-    const blocks = [];
-    blocks.push(new Paragraph({ children: [new TextRun({ text: "Test Details", bold: true })] }));
-    blocks.push(new Paragraph(`Subject: ${test.subject || "-"}`));
-    blocks.push(new Paragraph(`Class: ${test.className || "-"}`));
-    blocks.push(new Paragraph(`Date: ${test.date || "-"}`));
-    blocks.push(new Paragraph(`Time: ${test.time || "-"}`));
-    blocks.push(new Paragraph(`Duration: ${test.durationMinutes || "-"} min`));
-    blocks.push(new Paragraph(`Difficulty: ${test.difficulty || "-"}`));
-    blocks.push(new Paragraph(`Picking: ${test.shuffleQuestions ? "Random" : "Manual"}`));
-    blocks.push(new Paragraph(" "));
-    blocks.push(new Paragraph({ children: [new TextRun({ text: "Questions", bold: true })] }));
+    
+    // Load logo for watermark
+    const imgObj = new Image();
+    imgObj.src = schoolLogo;
+    await new Promise((resolve) => {
+      imgObj.onload = resolve;
+      imgObj.onerror = resolve;
+    });
 
+    const doc = new jsPDF();
+    
+    const addWatermark = () => {
+      try {
+        doc.setGState(new doc.GState({ opacity: 0.1 }));
+        doc.addImage(imgObj, "JPEG", 55, 100, 100, 100);
+        doc.setGState(new doc.GState({ opacity: 1.0 }));
+      } catch (e) {
+        // Fallback if GState/addImage fails
+      }
+    };
+
+    let yPos = 20;
+    addWatermark();
+    
+    // Header
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("MDDM Inter College", 105, yPos, { align: "center" });
+    yPos += 10;
+    
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Class: ${test.className || "-"}`, 105, yPos, { align: "center" });
+    yPos += 7;
+    doc.text(`Subject: ${test.subject || "-"}`, 105, yPos, { align: "center" });
+    yPos += 12;
+
+    // Student Details
+    doc.setFontSize(11);
+    doc.text("Student Name: ____________________________", 14, yPos);
+    doc.text("Roll Number: ______________", 120, yPos);
+    yPos += 10;
+    
+    // Marks
     const ids = Array.isArray(test.questionIds) ? test.questionIds : [];
+    let totalMarks = 0;
+    ids.forEach(id => {
+      const q = questionLookup.get(String(id));
+      if (q && q.marks) totalMarks += Number(q.marks);
+    });
+    
+    doc.text(`Total Marks: ${totalMarks}`, 14, yPos);
+    doc.text("Obtained Marks: ______________", 120, yPos);
+    yPos += 10;
+    
+    // Divider
+    doc.setLineWidth(0.5);
+    doc.line(14, yPos, 196, yPos);
+    yPos += 10;
+    
+    // Questions
     if (!ids.length) {
-      blocks.push(new Paragraph("Question list is unavailable for random picking."));
+      doc.text("Question list is unavailable for random picking.", 14, yPos);
     } else {
       ids.forEach((id, index) => {
         const q = questionLookup.get(String(id));
-        const options = Array.isArray(q?.options) ? q.options : [];
-        blocks.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `${index + 1}. ${stripTokens(q?.questionText || `Question ${index + 1}`)}`,
-              }),
-            ],
-          })
-        );
-        options.forEach((opt, optIndex) => {
-          const label = String.fromCharCode(65 + optIndex);
-          const text = stripTokens(opt?.text || "");
-          if (text) {
-            blocks.push(new Paragraph(`   ${label}) ${text}`));
-          }
-        });
-        if (q?.marks) {
-          blocks.push(new Paragraph(`   Marks: ${q.marks}`));
+        if (!q) return;
+        
+        // Add page if near bottom
+        if (yPos > 270) {
+          doc.addPage();
+          addWatermark();
+          yPos = 20;
         }
-        blocks.push(new Paragraph(" "));
+        
+        const qText = `${index + 1}. ${stripTokens(q.questionText || `Question ${index + 1}`)}`;
+        const splitText = doc.splitTextToSize(qText, 160); // Width 160 to leave room for marks on the right
+        doc.setFont("helvetica", "bold");
+        doc.text(splitText, 14, yPos);
+        
+        if (q.marks) {
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "italic");
+          doc.text(`[${q.marks} Marks]`, 180, yPos);
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "normal");
+        } else {
+          doc.setFont("helvetica", "normal");
+        }
+        
+        yPos += splitText.length * 6;
+        const options = Array.isArray(q.options) ? q.options : [];
+        const isSubjective = options.length === 1 && options[0]?.isSubjective;
+        
+        if (isSubjective) {
+           if (yPos > 250) {
+             doc.addPage();
+             addWatermark();
+             yPos = 20;
+           }
+           yPos += 8;
+           doc.setDrawColor(200, 200, 200);
+           doc.line(20, yPos, 190, yPos);
+           yPos += 10;
+           doc.line(20, yPos, 190, yPos);
+           yPos += 10;
+           doc.line(20, yPos, 190, yPos);
+           doc.setDrawColor(0, 0, 0); // reset
+        } else {
+          options.forEach((opt, optIndex) => {
+            const label = String.fromCharCode(65 + optIndex);
+            const text = stripTokens(opt?.text || "");
+            if (text) {
+               if (yPos > 280) {
+                 doc.addPage();
+                 addWatermark();
+                 yPos = 20;
+               }
+               const splitOpt = doc.splitTextToSize(`   ${label}) ${text}`, 170);
+               doc.text(splitOpt, 14, yPos);
+               yPos += splitOpt.length * 6;
+            }
+          });
+        }
+        yPos += 4; // Space between questions
       });
     }
-
-    const doc = new Document({
-      sections: [{ children: blocks }],
-    });
-    const blob = await Packer.toBlob(doc);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+    
     const nameBase = `${(test.subject || "test").replace(/\s+/g, "_")}_${(test.className || "class").replace(/\s+/g, "_")}`;
-    link.href = url;
-    link.download = `${nameBase}.docx`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    doc.save(`${nameBase}.pdf`);
   };
 
   const shareTestWhatsApp = (test) => {
@@ -423,9 +500,17 @@ function TeacherTestsPanel({
                     <button
                       type="button"
                       className="btn btn-outline btn-sm"
-                      onClick={() => downloadTestDocx(t)}
+                      onClick={() => downloadTestPdf(t)}
                     >
                       Download
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => handleDeleteTest(t.id)}
+                      style={{ color: "#ef4444", borderColor: "#ef4444" }}
+                    >
+                      Delete
                     </button>
                   </div>
                 </td>

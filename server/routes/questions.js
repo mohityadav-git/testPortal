@@ -132,33 +132,51 @@ router.post("/", async (req, res) => {
 /* ---------------- UPDATE question ---------------- */
 router.patch("/:id", async (req, res) => {
   const { id } = req.params;
-  const { difficulty, marks, section } = req.body || {};
+  const {
+    subject,
+    className,
+    questionText,
+    difficulty,
+    options,
+    correctIndex,
+    section,
+    imageUrl,
+    marks,
+  } = req.body || {};
 
   const updates = [];
+  if (subject !== undefined) updates.push("Subject = @Subject");
+  if (className !== undefined) updates.push("ClassName = @ClassName");
+  if (questionText !== undefined) updates.push("QuestionText = @QuestionText");
   if (difficulty !== undefined) updates.push("Difficulty = @Difficulty");
-  if (marks !== undefined) updates.push("Marks = @Marks");
+  if (options !== undefined) updates.push("OptionsJson = @OptionsJson");
+  if (correctIndex !== undefined) updates.push("CorrectIndex = @CorrectIndex");
   if (section !== undefined) updates.push("Section = @Section");
+  if (imageUrl !== undefined) updates.push("ImageUrl = @ImageUrl");
+  if (marks !== undefined) updates.push("Marks = @Marks");
 
   if (!updates.length) {
-    return res
-      .status(400)
-      .json({ error: "No updatable fields provided" });
+    return res.status(400).json({ error: "No updatable fields provided" });
   }
 
   try {
     const pool = await getPool();
     const request = pool.request().input("Id", sql.Int, Number(id));
 
-    if (difficulty !== undefined)
-      request.input("Difficulty", sql.NVarChar(50), difficulty || "Easy");
-    if (marks !== undefined)
-      request.input("Marks", sql.Int, Number(marks) || 1);
-    if (section !== undefined)
-      request.input("Section", sql.NVarChar(200), section || null);
+    if (subject !== undefined) request.input("Subject", sql.NVarChar(200), subject);
+    if (className !== undefined) request.input("ClassName", sql.NVarChar(50), className);
+    if (questionText !== undefined) request.input("QuestionText", sql.NVarChar(sql.MAX), questionText);
+    if (difficulty !== undefined) request.input("Difficulty", sql.NVarChar(50), difficulty || "Easy");
+    if (options !== undefined) {
+      const optionsJson = Array.isArray(options) ? JSON.stringify(options) : null;
+      request.input("OptionsJson", sql.NVarChar(sql.MAX), optionsJson);
+    }
+    if (correctIndex !== undefined) request.input("CorrectIndex", sql.Int, correctIndex);
+    if (section !== undefined) request.input("Section", sql.NVarChar(200), section || null);
+    if (imageUrl !== undefined) request.input("ImageUrl", sql.NVarChar(sql.MAX), imageUrl || null);
+    if (marks !== undefined) request.input("Marks", sql.Int, Number(marks) || 1);
 
-    await request.query(
-      `UPDATE Questions SET ${updates.join(", ")} WHERE Id = @Id`
-    );
+    await request.query(`UPDATE Questions SET ${updates.join(", ")} WHERE Id = @Id`);
 
     res.json({ message: "Question updated" });
   } catch (err) {

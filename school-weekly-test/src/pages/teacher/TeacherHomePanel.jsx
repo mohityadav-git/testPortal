@@ -112,18 +112,7 @@ function TeacherHomePanel({
             </div>
             <span className="tile-chip">{filteredQuestions.length}</span>
           </button>
-          <button
-            type="button"
-            className={`action-tile ${activePanel === "materials" ? "active" : ""}`}
-            onClick={() => setActivePanel("materials")}
-          >
-            <span className="tile-icon upcoming" aria-hidden="true">M</span>
-            <div className="tile-body">
-              <div className="tile-title">Study material</div>
-              <div className="tile-sub">Upload weekly notes</div>
-            </div>
-            <span className="tile-chip">{studyMaterials.length}</span>
-          </button>
+
           <button
             type="button"
             className={`action-tile ${activePanel === "results" ? "active" : ""}`}
@@ -136,18 +125,7 @@ function TeacherHomePanel({
             </div>
             <span className="tile-chip">{filteredResults.length}</span>
           </button>
-          <button
-            type="button"
-            className={`action-tile ${activePanel === "performance" ? "active" : ""}`}
-            onClick={() => setActivePanel("performance")}
-          >
-            <span className="tile-icon homework" aria-hidden="true">P</span>
-            <div className="tile-body">
-              <div className="tile-title">Performance</div>
-              <div className="tile-sub">Class insights</div>
-            </div>
-            <span className="tile-chip">{filteredResults.length}</span>
-          </button>
+
           <button
             type="button"
             className={`action-tile ${activePanel === "students" ? "active" : ""}`}

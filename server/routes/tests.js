@@ -166,4 +166,27 @@ router.patch("/:id/status", async (req, res) => {
   }
 });
 
+/* ---------------- DELETE test ---------------- */
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const pool = await getPool();
+    // Delete the test
+    const result = await pool
+      .request()
+      .input("Id", sql.Int, Number(id))
+      .query("DELETE FROM Tests WHERE Id = @Id");
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ error: "Test not found" });
+    }
+
+    res.json({ message: "Test deleted" });
+  } catch (err) {
+    console.error("Error deleting test", err);
+    res.status(500).json({ error: "Failed to delete test" });
+  }
+});
+
 module.exports = router;

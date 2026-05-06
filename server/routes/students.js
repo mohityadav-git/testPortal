@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { sql, getPool } = require("../config/db");
+const bcrypt = require("bcryptjs");
 
 /* ---------------- GET students ---------------- */
 router.get("/", async (req, res) => {
@@ -51,9 +52,9 @@ router.post("/", async (req, res) => {
       .input("RollNumber", sql.NVarChar(50), rollNumber || null)
       .input("MobileNumber", sql.NVarChar(20), mobileNumber || null)
       .query(`
-        INSERT INTO Students (StudentName, ClassName, RollNumber, MobileNumber)
+        INSERT INTO Students (StudentName, ClassName, RollNumber, MobileNumber, CreatedAt)
         OUTPUT INSERTED.Id
-        VALUES (@StudentName, @ClassName, @RollNumber, @MobileNumber)
+        VALUES (@StudentName, @ClassName, @RollNumber, @MobileNumber, GETDATE())
       `);
 
     res.status(201).json({
@@ -119,6 +120,31 @@ router.delete("/:id", async (req, res) => {
   } catch (err) {
     console.error("Error deleting student", err);
     res.status(500).json({ error: "Failed to delete student" });
+  }
+});
+
+/* ---------------- SET student password (by teacher) ---------------- */
+router.patch("/:id/set-password", async (req, res) => {
+  const { id } = req.params;
+  const { password } = req.body || {};
+
+  if (!password || password.length < 4) {
+    return res.status(400).json({ error: "Password must be at least 4 characters" });
+  }
+
+  try {
+    const pool = await getPool();
+    const hash = await bcrypt.hash(password, 10);
+    await pool
+      .request()
+      .input("Id", sql.Int, Number(id))
+      .input("PasswordHash", sql.NVarChar, hash)
+      .query("UPDATE Students SET PasswordHash = @PasswordHash WHERE Id = @Id");
+
+    res.json({ message: "Password set successfully" });
+  } catch (err) {
+    console.error("Error setting student password", err);
+    res.status(500).json({ error: "Failed to set password" });
   }
 });
 

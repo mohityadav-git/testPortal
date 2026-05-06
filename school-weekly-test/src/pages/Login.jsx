@@ -1,20 +1,28 @@
 import React, { useEffect, useState } from "react";
-import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { api } from "../services/api";
+import saraswatiMaa from "../assets/saraswati-maa.jpg";
 
-function Login() {
-  const [mode, setMode] = useState("student");
+// mode: "student" | "teacher" | "admin"
+function LoginPage({ mode = "student" }) {
   const [slideIndex, setSlideIndex] = useState(0);
   const [prevIndex, setPrevIndex] = useState(null);
-  const [studentName, setStudentName] = useState("");
-  const [studentPassword, setStudentPassword] = useState("");
-  const [studentError, setStudentError] = useState("");
-  const [teacherName, setTeacherName] = useState("");
-  const [teacherCode, setTeacherCode] = useState("");
-  const [teacherError, setTeacherError] = useState("");
 
-  const { loginStudent, loginTeacher } = useAuth();
+  // Student fields
+  const [studentRoll, setStudentRoll] = useState("");
+  const [studentMobile, setStudentMobile] = useState("");
+  const [studentPassword, setStudentPassword] = useState("");
+
+  // Teacher fields
+  const [teacherMobile, setTeacherMobile] = useState("");
+  const [teacherPassword, setTeacherPassword] = useState("");
+
+  // Admin fields
+  const [adminUsername, setAdminUsername] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const loginImages = [
@@ -40,97 +48,41 @@ function Login() {
     return () => clearTimeout(timer);
   }, [prevIndex]);
 
-  const handleModeChange = (newMode) => {
-    setMode(newMode);
-    setStudentError("");
-    setStudentName("");
-    setStudentPassword("");
-    setTeacherName("");
-    setTeacherCode("");
-  };
-
-  const handleStudentLogin = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setStudentError("");
-    const name = studentName.trim();
-    const pass = studentPassword.trim();
-    if (!name || !pass) {
-      setStudentError("Please enter name and password.");
-      return;
-    }
-
-    const [clsRaw, roll] = pass.split("@");
-    if (!clsRaw || !roll) {
-      setStudentError("Password format must be class@rollnumber (e.g., 8@21).");
-      return;
-    }
-    const classNumber = clsRaw.replace(/^class\s*/i, "").trim();
-    const normalizedClass = classNumber ? `Class ${classNumber}` : "";
+    setError("");
+    setLoading(true);
     try {
-      const matches = await api.getStudents({
-        className: normalizedClass,
-        rollNumber: roll,
-        studentName: name,
-      });
-      if (!Array.isArray(matches) || matches.length === 0) {
-        setStudentError("Student not found. Please contact your teacher.");
-        return;
+      let data;
+      if (mode === "admin") {
+        data = await api.adminLogin({ username: adminUsername, password: adminPassword });
+      } else if (mode === "teacher") {
+        data = await api.teacherLogin({ mobileNumber: teacherMobile, password: teacherPassword });
+      } else {
+        data = await api.studentLogin({ rollNumber: studentRoll, mobileNumber: studentMobile, password: studentPassword });
       }
-      loginStudent(name, normalizedClass, roll);
-      navigate("/student");
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.role);
+      localStorage.setItem("authUser", JSON.stringify({
+        name: data.name || data.username || "Admin",
+        role: data.role,
+        className: data.className || "",
+      }));
+
+      window.location.href = data.role === "admin" ? "/admin" : data.role === "teacher" ? "/teacher" : "/student";
     } catch (err) {
-      console.warn("Student lookup failed", err?.message);
-      setStudentError("Could not verify student. Try again.");
+      setError(err.message || "Invalid credentials");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleTeacherLogin = (e) => {
-    e.preventDefault();
-    setTeacherError("");
-    if (!teacherName || !teacherCode) {
-      setTeacherError("Enter name and class code.");
-      return;
-    }
-
-    const codeMap = {
-      "1@99": "Class 1",
-      "2@99": "Class 2",
-      "3@99": "Class 3",
-      "4@99": "Class 4",
-      "5@99": "Class 5",
-      "6@99": "Class 6",
-      "7@99": "Class 7",
-      "8@99": "Class 8",
-      "9@99": "Class 9",
-      "10@99": "Class 10",
-      "11@99": "Class 11",
-      "12@99": "Class 12",
-      "class1@99": "Class 1",
-      "class2@99": "Class 2",
-      "class3@99": "Class 3",
-      "class4@99": "Class 4",
-      "class5@99": "Class 5",
-      "class6@99": "Class 6",
-      "class7@99": "Class 7",
-      "class8@99": "Class 8",
-      "class9@99": "Class 9",
-      "class10@99": "Class 10",
-      "class11@99": "Class 11",
-      "class12@99": "Class 12",
-    };
-
-    const code = teacherCode.trim().toLowerCase();
-    const matchedClass = codeMap[code];
-    if (!matchedClass) {
-      setTeacherError("Invalid class code. Please check with admin.");
-      return;
-    }
-
-    loginTeacher(teacherName, matchedClass);
-    navigate("/teacher");
+  const titles = {
+    student: { heading: "Student Login", sub: "Enter your roll number, mobile and password to continue." },
+    teacher: { heading: "Teacher Login", sub: "Enter your registered mobile number and password." },
+    admin: { heading: "Admin Login", sub: "Restricted access. Authorised personnel only." },
   };
-
-  const isStudent = mode === "student";
 
   return (
     <div className="login-shell">
@@ -138,30 +90,21 @@ function Login() {
         {prevIndex !== null && (
           <div
             className="login-illustration-layer fade-out"
-            style={{
-              backgroundImage: `linear-gradient(135deg, rgba(255, 255, 255, 0.35), rgba(243, 250, 255, 0.3)), url('${loginImages[prevIndex]}')`,
-            }}
+            style={{ backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.35), rgba(243,250,255,0.3)), url('${loginImages[prevIndex]}')` }}
           />
         )}
         <div
           className="login-illustration-layer"
-          style={{
-            backgroundImage: `linear-gradient(135deg, rgba(255, 255, 255, 0.35), rgba(243, 250, 255, 0.3)), url('${loginImages[slideIndex]}')`,
-          }}
+          style={{ backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.35), rgba(243,250,255,0.3)), url('${loginImages[slideIndex]}')` }}
         />
         <div className="login-illustration-layout">
           <div className="login-illustration-content">
-            <span
-              className="brand-icon large login-logo"
-              aria-label="Saraswati Maa playing veena logo"
-              style={{ backgroundImage: "url('/saraswati-maa.jpg')" }}
-            >
+            <span className="brand-icon large login-logo" style={{ backgroundImage: `url('${saraswatiMaa}')` }}>
               <span className="brand-fallback">M</span>
             </span>
             <div className="login-illustration-title">MDDM Inter College</div>
             <div className="login-illustration-sub">
-              Build focus, confidence, and strong weekly performance.
-              <br />
+              Build focus, confidence, and strong weekly performance.<br />
               Weekly tests for smarter learning.
             </div>
           </div>
@@ -169,11 +112,7 @@ function Login() {
           <div className="login-panel">
             <div className="login-help-top">Need help?</div>
             <div className="login-brand-center">
-              <span
-                className="brand-icon large login-logo"
-                aria-label="Saraswati Maa playing veena logo"
-                style={{ backgroundImage: "url('/saraswati-maa.jpg')" }}
-              >
+              <span className="brand-icon large login-logo" style={{ backgroundImage: `url('${saraswatiMaa}')` }}>
                 <span className="brand-fallback">M</span>
               </span>
               <div className="login-brand-title">MDDM Inter College</div>
@@ -181,96 +120,60 @@ function Login() {
             </div>
 
             <div className="login-heading">
-              <h2>Log in</h2>
-              <p>Welcome back! Please log in to your account.</p>
+              <h2>{titles[mode].heading}</h2>
+              <p>{titles[mode].sub}</p>
             </div>
 
-            <div className="auth-toggle login-toggle">
-              <button
-                className={`toggle-btn ${isStudent ? "active" : ""}`}
-                onClick={() => handleModeChange("student")}
-                type="button"
-              >
-                Student Login
-              </button>
-              <button
-                className={`toggle-btn ${!isStudent ? "active" : ""}`}
-                onClick={() => handleModeChange("teacher")}
-                type="button"
-              >
-                Teacher Login
-              </button>
-            </div>
+            <form className="login-form" onSubmit={handleLogin}>
+              {mode === "student" && (
+                <>
+                  <label>
+                    Roll Number
+                    <input type="text" value={studentRoll} onChange={(e) => setStudentRoll(e.target.value)} placeholder="Enter your roll number" required />
+                  </label>
+                  <label>
+                    Mobile Number
+                    <input type="text" value={studentMobile} onChange={(e) => setStudentMobile(e.target.value)} placeholder="Registered mobile number" required />
+                  </label>
+                  <label>
+                    Password
+                    <input type="password" value={studentPassword} onChange={(e) => setStudentPassword(e.target.value)} placeholder="Enter password" required />
+                  </label>
+                </>
+              )}
 
-            {isStudent ? (
-              <form className="login-form" onSubmit={handleStudentLogin}>
-                <label>
-                  User ID
-                  <input
-                    type="text"
-                    value={studentName}
-                    onChange={(e) => setStudentName(e.target.value)}
-                    placeholder="Enter your name"
-                  />
-                </label>
-                <label>
-                  Password
-                  <input
-                    type="password"
-                    value={studentPassword}
-                    onChange={(e) => setStudentPassword(e.target.value)}
-                    placeholder="e.g. 8@21"
-                  />
-                </label>
-                {studentError && <div className="error-text">{studentError}</div>}
-                <div className="login-actions">
-                  <button
-                    type="button"
-                    className="login-link"
-                    onClick={() => alert("Please contact admin for password reset.")}
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
-                <button type="submit" className="btn login-btn">
-                  LOGIN
-                </button>
-              </form>
-            ) : (
-              <form className="login-form" onSubmit={handleTeacherLogin}>
-                <label>
-                  User ID
-                  <input
-                    type="text"
-                    value={teacherName}
-                    onChange={(e) => setTeacherName(e.target.value)}
-                    placeholder="Enter your name"
-                  />
-                </label>
-                <label>
-                  Password
-                  <input
-                    type="password"
-                    value={teacherCode}
-                    onChange={(e) => setTeacherCode(e.target.value)}
-                    placeholder="Enter teacher code"
-                  />
-                </label>
-                {teacherError && <div className="error-text">{teacherError}</div>}
-                <div className="login-actions">
-                  <button
-                    type="button"
-                    className="login-link"
-                    onClick={() => alert("Please contact admin for password reset.")}
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
-                <button type="submit" className="btn login-btn">
-                  LOGIN
-                </button>
-              </form>
-            )}
+              {mode === "teacher" && (
+                <>
+                  <label>
+                    Mobile Number
+                    <input type="text" value={teacherMobile} onChange={(e) => setTeacherMobile(e.target.value)} placeholder="Registered mobile number" required />
+                  </label>
+                  <label>
+                    Password
+                    <input type="password" value={teacherPassword} onChange={(e) => setTeacherPassword(e.target.value)} placeholder="Enter password" required />
+                  </label>
+                </>
+              )}
+
+              {mode === "admin" && (
+                <>
+                  <label>
+                    Username
+                    <input type="text" value={adminUsername} onChange={(e) => setAdminUsername(e.target.value)} placeholder="Admin username" required />
+                  </label>
+                  <label>
+                    Password
+                    <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} placeholder="Enter password" required />
+                  </label>
+                </>
+              )}
+
+              {error && <div className="error-text" style={{ color: "red" }}>{error}</div>}
+
+              <button type="submit" className="btn login-btn" disabled={loading}>
+                {loading ? "Logging in..." : "LOGIN"}
+              </button>
+            </form>
 
             <div className="login-help">
               <div>Helpline: +91 7065465400</div>
@@ -284,4 +187,4 @@ function Login() {
   );
 }
 
-export default Login;
+export default LoginPage;

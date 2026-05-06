@@ -9,6 +9,8 @@ const resultsRouter = require("./routes/results");
 const studentsRouter = require("./routes/students");
 const uploadsRouter = require("./routes/uploads");
 const studyMaterialsRouter = require("./routes/studyMaterials");
+const authRouter = require("./routes/auth");
+const teachersRouter = require("./routes/teachers");
 const path = require("path");
 
 const app = express();
@@ -32,6 +34,8 @@ app.use("/results", resultsRouter);
 app.use("/students", studentsRouter);
 app.use("/uploads", uploadsRouter);
 app.use("/study-materials", studyMaterialsRouter);
+app.use("/auth", authRouter);
+app.use("/teachers", teachersRouter);
 
 const ensureColumn = async (table, column, definition) => {
   const pool = await getPool();
@@ -103,6 +107,33 @@ const ensureSchema = async () => {
           ClassName NVARCHAR(50) NOT NULL,
           RollNumber NVARCHAR(50) NULL,
           MobileNumber NVARCHAR(20) NULL,
+          PasswordHash NVARCHAR(MAX) NULL,
+          CreatedAt DATETIME NOT NULL DEFAULT GETDATE()
+        )
+      `
+    );
+    await ensureColumn("Students", "PasswordHash", "NVARCHAR(MAX) NULL");
+    
+    await ensureTable(
+      "Teachers",
+      `
+        CREATE TABLE Teachers (
+          Id INT IDENTITY(1,1) PRIMARY KEY,
+          TeacherName NVARCHAR(200) NOT NULL,
+          MobileNumber NVARCHAR(20) NOT NULL UNIQUE,
+          PasswordHash NVARCHAR(MAX) NULL,
+          CreatedAt DATETIME NOT NULL DEFAULT GETDATE()
+        )
+      `
+    );
+    
+    await ensureTable(
+      "Admins",
+      `
+        CREATE TABLE Admins (
+          Id INT IDENTITY(1,1) PRIMARY KEY,
+          Username NVARCHAR(50) NOT NULL UNIQUE,
+          PasswordHash NVARCHAR(MAX) NOT NULL,
           CreatedAt DATETIME NOT NULL DEFAULT GETDATE()
         )
       `

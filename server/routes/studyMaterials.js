@@ -133,10 +133,10 @@ router.post("/", upload.single("file"), async (req, res) => {
       .input("TeacherName", sql.NVarChar(200), teacherName || null)
       .query(`
         INSERT INTO StudyMaterials
-        (Title, Subject, ClassName, WeekStart, FileUrl, FileName, TeacherName)
+        (Title, Subject, ClassName, WeekStart, FileUrl, FileName, TeacherName, UploadedAt)
         OUTPUT INSERTED.Id
         VALUES
-        (@Title, @Subject, @ClassName, @WeekStart, @FileUrl, @FileName, @TeacherName)
+        (@Title, @Subject, @ClassName, @WeekStart, @FileUrl, @FileName, @TeacherName, GETDATE())
       `);
 
     res.status(201).json({

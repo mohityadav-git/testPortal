@@ -6,9 +6,7 @@ import { api } from "../services/api";
 import saraswatiMaa from "../assets/saraswati-maa.jpg";
 import StudentHomePanel from "./student/StudentHomePanel";
 import StudentUpcomingPanel from "./student/StudentUpcomingPanel";
-import StudentMaterialsPanel from "./student/StudentMaterialsPanel";
 import StudentPastResultsPanel from "./student/StudentPastResultsPanel";
-import StudentRightPanel from "./student/StudentRightPanel";
 
 function StudentDashboard() {
   const { user, logout } = useAuth();
@@ -89,6 +87,13 @@ function StudentDashboard() {
             score: r.Score,
             outOf: r.OutOf,
             submittedAt: r.SubmittedAt,
+            answers: (function() {
+              try {
+                return r.AnswersJson ? (typeof r.AnswersJson === "string" ? JSON.parse(r.AnswersJson) : r.AnswersJson) : null;
+              } catch (e) {
+                return null;
+              }
+            })(),
           }))
         );
         setResultsError(null);
@@ -389,14 +394,7 @@ function StudentDashboard() {
               >
                 Results
               </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                style={navButtonStyle(activePanel === "materials")}
-                onClick={() => setActivePanel("materials")}
-              >
-                Study material
-              </button>
+
             </div>
           )}
           {isNarrow && (
@@ -459,16 +457,7 @@ function StudentDashboard() {
               >
                 Past Results
               </button>
-              <button
-                type="button"
-                className="link-btn side-menu-btn"
-                onClick={() => {
-                  setActivePanel("materials");
-                  setShowMenu(false);
-                }}
-              >
-                Study material
-              </button>
+
             </div>
           )}
           <button type="button" className="btn btn-outline btn-sm" onClick={handleLogout}>
@@ -493,12 +482,7 @@ function StudentDashboard() {
             <button className={`link-btn side-menu-btn ${activePanel === "past" ? "active" : ""}`} onClick={() => setActivePanel("past")}>
               Past Results
             </button>
-            <button
-              className={`link-btn side-menu-btn ${activePanel === "materials" ? "active" : ""}`}
-              onClick={() => setActivePanel("materials")}
-            >
-              Study material
-            </button>
+
           </nav>
           <div className="side-menu-heading" style={{ marginTop: 10 }}>
             Other
@@ -540,17 +524,7 @@ function StudentDashboard() {
             />
           )}
 
-          {activePanel === "materials" && (
-            <StudentMaterialsPanel
-              materialSubject={materialSubject}
-              setMaterialSubject={setMaterialSubject}
-              materialClass={materialClass}
-              setMaterialClass={setMaterialClass}
-              studyMaterialsError={studyMaterialsError}
-              isMaterialsLoading={isMaterialsLoading}
-              studyMaterials={studyMaterials}
-            />
-          )}
+
 
           {activePanel === "past" && (
             <StudentPastResultsPanel
@@ -563,11 +537,7 @@ function StudentDashboard() {
 
         </div>
 
-        <StudentRightPanel
-          pastTests={pastTests}
-          avgPercent={avgPercent}
-          bestScore={bestScore}
-        />
+
       </div>
 
     </div>

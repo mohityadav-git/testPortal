@@ -63,67 +63,7 @@ function StudentHomePanel({
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div className="section-header">
-          <div>
-            <div className="section-title">Performance Dashboard</div>
-            <div className="section-sub">Total tests, average score, and best score</div>
-          </div>
-        </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, marginTop: 12 }}>
-          <div className="mini-card" style={{ border: "1px solid #e6e9ef", borderRadius: 12, padding: 14 }}>
-            <div className="section-sub">Total tests completed</div>
-            <div className="perf-value" style={{ fontSize: 34, fontWeight: 800, color: "#1f2d3d" }}>
-              {pastTests.length}
-            </div>
-          </div>
-          <div className="mini-card" style={{ border: "1px solid #e6e9ef", borderRadius: 12, padding: 14 }}>
-            <div className="section-sub">Average score</div>
-            <div className="perf-value" style={{ fontSize: 34, fontWeight: 800, color: "#1f2d3d" }}>
-              {avgPercent.toFixed(1)}%
-            </div>
-          </div>
-          <div className="mini-card" style={{ border: "1px solid #e6e9ef", borderRadius: 12, padding: 14 }}>
-            <div className="section-sub">Highest score</div>
-            <div className="perf-value" style={{ fontSize: 34, fontWeight: 800, color: "#1f2d3d" }}>
-              {bestScore.toFixed(1)}%
-            </div>
-          </div>
-        </div>
-        <div
-          className="mini-card score-trend-card"
-          style={{ border: "1px solid #e6e9ef", borderRadius: 12, padding: 14, marginTop: 12 }}
-        >
-          <div className="section-title" style={{ marginBottom: 6 }}>Score trend</div>
-          <div className="section-sub" style={{ marginBottom: 12 }}>Latest test performance</div>
-          {performanceChartData.length === 0 ? (
-            <div className="section-sub">No results yet.</div>
-          ) : (
-            <div className="score-trend-chart" style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 170 }}>
-              {performanceChartData.map((row, idx) => (
-                <div key={`${row.label}-${idx}`} style={{ flex: 1, display: "grid", gap: 6 }}>
-                  <div style={{ height: 120, display: "flex", alignItems: "flex-end" }}>
-                    <div
-                      style={{
-                        width: "100%",
-                        height: `${Math.max(6, row.percent)}%`,
-                        background: "linear-gradient(180deg, #6aaed6, #18b8b5)",
-                        borderRadius: 10,
-                        transition: "height 0.3s ease",
-                      }}
-                    />
-                  </div>
-                          <div style={{ fontSize: 11, color: "#4b5563", textAlign: "center" }}>{row.label}</div>
-                          <div style={{ fontSize: 12, fontWeight: 700, textAlign: "center" }}>
-                            {row.percent.toFixed(0)}%
-                          </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
       <div className="card student-action-card">
         <div className="section-header">
           <div>

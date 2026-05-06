@@ -11,8 +11,20 @@ function App() {
     <div className="app-container">
       <main className="main-content">
         <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/login" element={<Login />} />
+          {/* Separate login pages per role - students only see student login */}
+          <Route path="/" element={<Login mode="student" />} />
+          <Route path="/login" element={<Login mode="student" />} />
+          <Route path="/teacher-login" element={<Login mode="teacher" />} />
+          <Route path="/admin-login" element={<Login mode="admin" />} />
+
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute role="admin">
+                <TeacherDashboard isAdmin={true} />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/student"

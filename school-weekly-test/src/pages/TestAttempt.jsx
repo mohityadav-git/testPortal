@@ -463,8 +463,6 @@ function TestAttempt() {
     let sc = 0;
     let totalMarks = 0;
     questions.forEach((q) => {
-      const isSubjective = (q.type || testMeta?.type) === "Subjective";
-      if (isSubjective) return;
       const marks = Number(q.marks || 1);
       totalMarks += marks;
       if (answers[q.id] === q.correctIndex) sc += marks;
@@ -493,6 +491,7 @@ function TestAttempt() {
     const answerSheet = questions.map((q) => ({
       id: q.id,
       question: q.question,
+      imageUrls: q.imageUrls || [],
       options: q.options,
       selectedIndex: answers[q.id],
       selectedText: answerTexts[q.id],
@@ -696,7 +695,7 @@ function TestAttempt() {
                 ))}
               </div>
             )}
-            {currentType === "Subjective" || !currentQuestion.options || currentQuestion.options.length === 0 ? (
+            {currentType === "Subjective" ? (
               <textarea
                 rows={4}
                 style={{ width: "100%", borderRadius: 8, padding: 10, border: "1px solid #d9dbe0" }}
