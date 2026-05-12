@@ -7,6 +7,7 @@ function TeacherResultsPanel({
   isResultsLoading,
   resultsError,
   filteredResults,
+  filteredTests,
   selectedResult,
   setSelectedResult,
   loadResults,
@@ -15,18 +16,32 @@ function TeacherResultsPanel({
   const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
   const ASSET_BASE = API_BASE.replace(/\/api\/?$/, "");
 
-  const [filterDate, setFilterDate] = useState("");
-  const [filterClass, setFilterClass] = useState("");
-  const [filterSubject, setFilterSubject] = useState("");
-  const [filterStudent, setFilterStudent] = useState("");
+  // View state: null = test list, string testId = student list for that test, result = answer sheet
+  const [selectedTestId, setSelectedTestId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const displayResults = filteredResults.filter((r) => {
-    if (filterDate && r.submittedAt && !String(r.submittedAt).startsWith(filterDate)) return false;
-    if (filterClass && (!r.className || !r.className.toLowerCase().includes(filterClass.toLowerCase()))) return false;
-    if (filterSubject && (!r.subject || !r.subject.toLowerCase().includes(filterSubject.toLowerCase()))) return false;
-    if (filterStudent && (!r.studentName || !r.studentName.toLowerCase().includes(filterStudent.toLowerCase()))) return false;
-    return true;
+
+  // Group results by testId
+  const resultsByTestId = {};
+  filteredResults.forEach((r) => {
+    const tid = String(r.testId || r.TestId || "unknown");
+    if (!resultsByTestId[tid]) resultsByTestId[tid] = [];
+    resultsByTestId[tid].push(r);
   });
+
+  // Get the selected test object
+  const selectedTest = filteredTests?.find(
+    (t) => String(t.id || t.Id) === String(selectedTestId)
+  );
+
+  // Results for the selected test
+  const testResults = selectedTestId ? (resultsByTestId[String(selectedTestId)] || []) : [];
+  const filteredTestResults = testResults.filter((r) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (r.studentName || "").toLowerCase().includes(q);
+  });
+
   const parseAnswers = (raw) => {
     if (!raw) return [];
     if (Array.isArray(raw)) return raw;
@@ -270,164 +285,249 @@ function TeacherResultsPanel({
     doc.save(`${nameBase}_answers.pdf`);
   };
 
-  return (
-    <div className="card">
-      <div className="section-header">
-        <div>
-          <div className="section-title">Student results</div>
-          <div className="section-sub">Latest submissions</div>
-        </div>
-        <button type="button" className="btn btn-outline btn-sm" onClick={loadResults}>
-          Refresh
-        </button>
-      </div>
-      {!selectedResult && (
-        <div className="form-grid" style={{ paddingBottom: 16, borderBottom: "1px solid #e5e7eb", marginBottom: 16 }}>
-          <label>
-            <span>Filter by Date</span>
-            <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
-          </label>
-          <label>
-            <span>Filter by Class</span>
-            <input type="text" placeholder="All classes..." value={filterClass} onChange={(e) => setFilterClass(e.target.value)} />
-          </label>
-          <label>
-            <span>Filter by Subject</span>
-            <input type="text" placeholder="All subjects..." value={filterSubject} onChange={(e) => setFilterSubject(e.target.value)} />
-          </label>
-          <label>
-            <span>Filter by Student</span>
-            <input type="text" placeholder="All students..." value={filterStudent} onChange={(e) => setFilterStudent(e.target.value)} />
-          </label>
-        </div>
-      )}
-      {isResultsLoading ? (
-        <div className="section-sub">Loading results...</div>
-      ) : resultsError ? (
-        <div className="section-sub" style={{ color: "#c23" }}>{resultsError}</div>
-      ) : displayResults.length === 0 ? (
-        <div className="section-sub">No results yet.</div>
-      ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Student</th>
-              <th>Class</th>
-              <th>Subject</th>
-              <th>Score</th>
-              <th>Out of</th>
-              <th>Submitted</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {(selectedResult ? [selectedResult] : displayResults).map((r) => (
-              <tr key={`${r.id}-${r.subject}`}>
-                <td>{r.studentName}</td>
-                <td>{r.className}</td>
-                <td>{r.subject}</td>
-                <td>{r.score}</td>
-                <td>{r.outOf}</td>
-                <td>{r.submittedAt ? String(r.submittedAt).slice(0, 10) : "-"}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => setSelectedResult(r)}
-                    style={{ marginRight: 6 }}
-                  >
-                    View
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {selectedResult && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="section-header">
-            <div>
-              <div className="section-title">
-                Answer sheet: {selectedResult.studentName || "Student"}
-              </div>
-              <div className="section-sub">
-                {selectedResult.subject} ú {selectedResult.className} ú{" "}
-                {selectedResult.submittedAt ? String(selectedResult.submittedAt).slice(0, 10) : "-"}
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => downloadAnswerSheet(selectedResult)}
-              >
-                Download answers
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => setSelectedResult(null)}
-              >
-                Close
-              </button>
+  // ─── LEVEL 3: Answer sheet ────────────────────────────────────────────────
+  if (selectedResult) {
+    return (
+      <div className="card">
+        <div className="section-header">
+          <div>
+            <div className="section-title">Answer sheet: {selectedResult.studentName || "Student"}</div>
+            <div className="section-sub">
+              {selectedResult.subject} · {selectedResult.className} ·{" "}
+              {selectedResult.submittedAt ? String(selectedResult.submittedAt).slice(0, 10) : "-"}
             </div>
           </div>
-          {parseAnswers(selectedResult.answers).length === 0 ? (
-            <div className="section-sub">No answers recorded for this test.</div>
-          ) : (
-            <ul className="question-list">
-              {parseAnswers(selectedResult.answers).map((a, idx) => (
-                <li key={`${selectedResult.id}-ans-${idx}`} style={{ display: "grid", gap: 6 }}>
-                  <div style={{ fontWeight: 700 }}>
-                    Q{idx + 1}:{" "}
-                    <span
-                      dangerouslySetInnerHTML={toDangerousHtml(a.question || a.QuestionText || "-")}
-                    />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => downloadAnswerSheet(selectedResult)}>
+              Download
+            </button>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setSelectedResult(null)}>
+              ← Back
+            </button>
+          </div>
+        </div>
+        {parseAnswers(selectedResult.answers).length === 0 ? (
+          <div className="section-sub">No answers recorded for this test.</div>
+        ) : (
+          <ul className="question-list">
+            {parseAnswers(selectedResult.answers).map((a, idx) => (
+              <li key={`${selectedResult.id}-ans-${idx}`} style={{ display: "grid", gap: 6 }}>
+                <div style={{ fontWeight: 700 }}>
+                  Q{idx + 1}:{" "}
+                  <span dangerouslySetInnerHTML={toDangerousHtml(a.question || a.QuestionText || "-")} />
+                </div>
+                {/* Question Images */}
+                {(a.imageUrl || a.ImageUrl) && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                    {(Array.isArray(a.imageUrl || a.ImageUrl) 
+                      ? (a.imageUrl || a.ImageUrl) 
+                      : (() => { try { const p = JSON.parse(a.imageUrl || a.ImageUrl); return Array.isArray(p) ? p : [a.imageUrl || a.ImageUrl]; } catch { return [a.imageUrl || a.ImageUrl]; } })()
+                    ).filter(Boolean).map((url, i) => (
+                      <img 
+                        key={i} 
+                        src={url.startsWith("http") ? url : `http://localhost:5000${url}`} 
+                        alt="" 
+                        style={{ height: 60, borderRadius: 4, border: "1px solid #e5e7eb" }} 
+                      />
+                    ))}
                   </div>
-                  {Array.isArray(a.options) && a.options.length > 0 ? (
-                    <ul className="question-list" style={{ margin: 0 }}>
-                      {a.options.map((opt, optIdx) => {
-                        const label = typeof opt === "string" ? opt : opt.text || opt.imageUrl || "-";
-                        const isSelected = optIdx === a.selectedIndex;
-                        const isCorrect = optIdx === a.correctIndex;
-                        return (
-                          <li
-                            key={`${selectedResult.id}-ans-${idx}-opt-${optIdx}`}
-                            style={{
-                              display: "flex",
-                              gap: 8,
-                              alignItems: "center",
-                              fontWeight: isSelected ? 700 : 600,
-                              color: isSelected ? "#0f172a" : "#374151",
-                            }}
-                          >
+                )}
+                {Array.isArray(a.options) && a.options.length > 0 ? (
+                  <ul className="question-list" style={{ margin: 0 }}>
+                    {a.options.map((opt, optIdx) => {
+                      const label = typeof opt === "string" ? opt : opt.text || opt.imageUrl || "-";
+                      const isSelected = optIdx === a.selectedIndex;
+                      const isCorrect = optIdx === a.correctIndex;
+                      return (
+                        <li key={`ans-${idx}-opt-${optIdx}`} style={{ display: "grid", gap: 4, padding: "4px 0" }}>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: isSelected ? 700 : 600, color: isSelected ? "#0f172a" : "#374151" }}>
                             <span>{optIdx + 1}.</span>
-                            <span dangerouslySetInnerHTML={toDangerousHtml(label)} />
+                            <span dangerouslySetInnerHTML={toDangerousHtml(typeof opt === "string" ? opt : opt.text || "")} />
                             {isSelected && <span className="section-sub">(selected)</span>}
                             {!isSelected && isCorrect && <span className="section-sub">(correct)</span>}
                             {isSelected && isCorrect && <span className="section-sub">(correct)</span>}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <div className="section-sub">Options not recorded.</div>
-                  )}
-                  <div className="section-sub">
-                    Selected:{" "}
-                    {a.selectedIndex !== undefined && a.selectedIndex !== null ? a.selectedIndex + 1 : "-"}
-                    {a.selectedText ? ` (${a.selectedText})` : ""}
-                  </div>
-                  <div className="section-sub">
-                    Correct:{" "}
-                    {a.correctIndex !== undefined && a.correctIndex !== null ? a.correctIndex + 1 : "-"}
-                  </div>
-                </li>
-              ))}
-            </ul>
+                          </div>
+                          {opt.imageUrl && (
+                            <img 
+                              src={opt.imageUrl.startsWith("http") ? opt.imageUrl : `http://localhost:5000${opt.imageUrl}`} 
+                              alt="" 
+                              style={{ height: 40, marginLeft: 24, borderRadius: 4, border: "1px solid #f3f4f6" }} 
+                            />
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <div className="section-sub">Options not recorded.</div>
+                )}
+                <div className="section-sub">
+                  Selected: {a.selectedIndex != null ? a.selectedIndex + 1 : "-"}
+                  {a.selectedText ? ` (${a.selectedText})` : ""}
+                </div>
+                <div className="section-sub">Correct: {a.correctIndex != null ? a.correctIndex + 1 : "-"}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
+  // ─── LEVEL 2: Students who submitted a test ───────────────────────────────
+  if (selectedTestId) {
+    return (
+      <div className="card">
+        <div className="section-header" style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: 18, padding: "2px 10px" }}
+              onClick={() => { setSelectedTestId(null); setSearchQuery(""); }}>
+              ←
+            </button>
+            <div>
+              <div className="section-title">{selectedTest?.subject || "Test"}</div>
+              <div className="section-sub">
+                {selectedTest?.date ? new Date(selectedTest.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : ""} · {testResults.length} submission{testResults.length !== 1 ? "s" : ""}
+              </div>
+            </div>
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={loadResults}>Refresh</button>
+        </div>
+
+        {/* Search */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <input
+            type="text"
+            placeholder="Search student..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ flex: 1, padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14, outline: "none" }}
+          />
+          {searchQuery && (
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setSearchQuery("")}>✕</button>
           )}
+        </div>
+
+        {testResults.length === 0 ? (
+          <div className="section-sub" style={{ textAlign: "center", padding: "24px 0" }}>No submissions yet for this test.</div>
+        ) : filteredTestResults.length === 0 ? (
+          <div className="section-sub" style={{ padding: "16px 0" }}>No students match your search.</div>
+        ) : (
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Student</th>
+                  <th>Score</th>
+                  <th>Submitted At</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTestResults.map((r, i) => {
+                  const pct = r.outOf > 0 ? Math.round((r.score / r.outOf) * 100) : 0;
+                  return (
+                    <tr key={r.id || i}>
+                      <td style={{ color: "#9ca3af" }}>{i + 1}</td>
+                      <td style={{ fontWeight: 600 }}>{r.studentName}</td>
+                      <td>
+                        <span style={{
+                          background: pct >= 60 ? "#dcfce7" : "#fee2e2",
+                          color: pct >= 60 ? "#166534" : "#991b1b",
+                          borderRadius: 999, padding: "2px 10px", fontSize: 12, fontWeight: 700
+                        }}>
+                          {r.score}/{r.outOf} ({pct}%)
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 12, color: "#6b7280" }}>
+                        {r.submittedAt ? new Date(r.submittedAt).toLocaleString("en-IN") : "-"}
+                      </td>
+                      <td>
+                        <button type="button" className="btn btn-outline btn-sm" onClick={() => setSelectedResult(r)}>
+                          View Answers
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ─── LEVEL 1: Test list ───────────────────────────────────────────────────
+  return (
+    <div className="card">
+      <div className="section-header" style={{ marginBottom: 16 }}>
+        <div>
+          <div className="section-title">Results</div>
+          <div className="section-sub">Click a test to see who submitted it</div>
+        </div>
+        <button type="button" className="btn btn-outline btn-sm" onClick={loadResults}>Refresh</button>
+      </div>
+
+      {isResultsLoading ? (
+        <div className="section-sub" style={{ padding: "20px 0" }}>Loading results...</div>
+      ) : resultsError ? (
+        <div className="section-sub" style={{ color: "var(--danger)", padding: "20px 0" }}>{resultsError}</div>
+      ) : !filteredTests || filteredTests.length === 0 ? (
+        <div className="section-sub" style={{ padding: "20px 0" }}>No tests found.</div>
+      ) : (
+        <div className="table-container">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Subject</th>
+                <th>Date</th>
+                <th>Submissions</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTests.map((t, i) => {
+                const tid = String(t.id || t.Id);
+                const submissionCount = (resultsByTestId[tid] || []).length;
+                const testDate = t.date ? new Date(t.date) : null;
+                const today = new Date(); today.setHours(0, 0, 0, 0);
+                if (testDate) testDate.setHours(0, 0, 0, 0);
+                const isPast = testDate && testDate < today;
+                return (
+                  <tr key={tid} style={{ cursor: "pointer" }} onClick={() => { setSelectedTestId(tid); setSearchQuery(""); }}>
+                    <td style={{ color: "#9ca3af" }}>{i + 1}</td>
+                    <td style={{ fontWeight: 600, color: "#3730a3" }}>{t.subject}</td>
+                    <td style={{ fontSize: 13 }}>
+                      {testDate ? testDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "-"}
+                      <span style={{
+                        marginLeft: 8, fontSize: 11, fontWeight: 600, borderRadius: 999,
+                        padding: "1px 8px",
+                        background: isPast ? "#fee2e2" : "#dcfce7",
+                        color: isPast ? "#991b1b" : "#166534"
+                      }}>
+                        {isPast ? "Past" : "Upcoming"}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{
+                        background: submissionCount > 0 ? "#e0e7ff" : "#f3f4f6",
+                        color: submissionCount > 0 ? "#3730a3" : "#6b7280",
+                        borderRadius: 999, padding: "2px 12px", fontSize: 13, fontWeight: 700
+                      }}>
+                        {submissionCount} student{submissionCount !== 1 ? "s" : ""}
+                      </span>
+                    </td>
+                    <td>
+                      <button type="button" className="btn btn-outline btn-sm">View →</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

@@ -1,10 +1,24 @@
 const express = require("express");
 const router = express.Router();
 const { sql, getPool } = require("../config/db");
+const { verifyToken } = require("../utils/authMiddleware");
 
 /* ---------------- GET results ---------------- */
-router.get("/", async (req, res) => {
-  const { className, subject, studentName } = req.query;
+router.get("/", verifyToken, async (req, res) => {
+  let { className, subject, studentName } = req.query;
+
+  // Teachers can only see results for their assigned class
+  if (req.user?.role === "teacher") {
+    let tc = req.user.className || "";
+    if (!tc) {
+      try {
+        const pool = await getPool();
+        const r = await pool.request().input("Id", sql.Int, req.user.id).query("SELECT ClassName FROM Teachers WHERE Id = @Id");
+        tc = r.recordset[0]?.ClassName || "";
+      } catch {}
+    }
+    if (tc) className = tc;
+  }
 
   let query =
     "SELECT Id, TestId, StudentName, ClassName, Subject, Score, OutOf, SubmittedAt, AnswersJson FROM Results";

@@ -38,6 +38,8 @@ function TeacherTestsPanel({
   testsError,
   filteredTests,
   handleDeleteTest,
+  isAdmin,
+  teacherClass,
 }) {
   const [questionSearch, setQuestionSearch] = React.useState("");
   const [bankSubjectFilter, setBankSubjectFilter] = React.useState("all");
@@ -114,6 +116,41 @@ function TeacherTestsPanel({
       imgObj.onerror = resolve;
     });
 
+    const loadImage = (url) => {
+      if (!url) return Promise.resolve(null);
+      const fullUrl = url.startsWith("http") ? url : `http://localhost:5000${url}`;
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.src = fullUrl;
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+      });
+    };
+
+    const ids = Array.isArray(test.questionIds) ? test.questionIds : [];
+    const questionsForPdf = ids.map(id => questionLookup.get(String(id))).filter(Boolean);
+
+    // Preload all images
+    const imageCache = new Map();
+    for (const q of questionsForPdf) {
+      // Question images
+      const qUrls = (Array.isArray(q.imageUrl) 
+        ? q.imageUrl 
+        : (() => { try { const p = JSON.parse(q.imageUrl); return Array.isArray(p) ? p : [q.imageUrl]; } catch { return [q.imageUrl]; } })()
+      ).filter(Boolean);
+      for (const url of qUrls) {
+        if (!imageCache.has(url)) imageCache.set(url, await loadImage(url));
+      }
+      // Option images
+      const options = Array.isArray(q.options) ? q.options : [];
+      for (const opt of options) {
+        if (opt?.imageUrl && !imageCache.has(opt.imageUrl)) {
+          imageCache.set(opt.imageUrl, await loadImage(opt.imageUrl));
+        }
+      }
+    }
+
     const doc = new jsPDF();
     
     const addWatermark = () => {
@@ -121,9 +158,7 @@ function TeacherTestsPanel({
         doc.setGState(new doc.GState({ opacity: 0.1 }));
         doc.addImage(imgObj, "JPEG", 55, 100, 100, 100);
         doc.setGState(new doc.GState({ opacity: 1.0 }));
-      } catch (e) {
-        // Fallback if GState/addImage fails
-      }
+      } catch (e) {}
     };
 
     let yPos = 20;
@@ -149,39 +184,26 @@ function TeacherTestsPanel({
     yPos += 10;
     
     // Marks
-    const ids = Array.isArray(test.questionIds) ? test.questionIds : [];
     let totalMarks = 0;
-    ids.forEach(id => {
-      const q = questionLookup.get(String(id));
-      if (q && q.marks) totalMarks += Number(q.marks);
-    });
+    questionsForPdf.forEach(q => { if (q.marks) totalMarks += Number(q.marks); });
     
     doc.text(`Total Marks: ${totalMarks}`, 14, yPos);
     doc.text("Obtained Marks: ______________", 120, yPos);
     yPos += 10;
     
-    // Divider
     doc.setLineWidth(0.5);
     doc.line(14, yPos, 196, yPos);
     yPos += 10;
     
     // Questions
-    if (!ids.length) {
-      doc.text("Question list is unavailable for random picking.", 14, yPos);
+    if (!questionsForPdf.length) {
+      doc.text("Question list is unavailable.", 14, yPos);
     } else {
-      ids.forEach((id, index) => {
-        const q = questionLookup.get(String(id));
-        if (!q) return;
+      questionsForPdf.forEach((q, index) => {
+        if (yPos > 260) { doc.addPage(); addWatermark(); yPos = 20; }
         
-        // Add page if near bottom
-        if (yPos > 270) {
-          doc.addPage();
-          addWatermark();
-          yPos = 20;
-        }
-        
-        const qText = `${index + 1}. ${stripTokens(q.questionText || `Question ${index + 1}`)}`;
-        const splitText = doc.splitTextToSize(qText, 160); // Width 160 to leave room for marks on the right
+        const qText = `${index + 1}. ${stripTokens(q.questionText || "")}`;
+        const splitText = doc.splitTextToSize(qText, 160);
         doc.setFont("helvetica", "bold");
         doc.text(splitText, 14, yPos);
         
@@ -191,47 +213,67 @@ function TeacherTestsPanel({
           doc.text(`[${q.marks} Marks]`, 180, yPos);
           doc.setFontSize(11);
           doc.setFont("helvetica", "normal");
-        } else {
-          doc.setFont("helvetica", "normal");
         }
         
         yPos += splitText.length * 6;
+
+        // Question Images
+        const qUrls = (Array.isArray(q.imageUrl) 
+          ? q.imageUrl 
+          : (() => { try { const p = JSON.parse(q.imageUrl); return Array.isArray(p) ? p : [q.imageUrl]; } catch { return [q.imageUrl]; } })()
+        ).filter(Boolean);
+
+        qUrls.forEach(url => {
+          const img = imageCache.get(url);
+          if (img) {
+            const ratio = img.width / img.height;
+            let imgW = Math.min(100, 160);
+            let imgH = imgW / ratio;
+            if (yPos + imgH > 270) { doc.addPage(); addWatermark(); yPos = 20; }
+            try { doc.addImage(img, "JPEG", 20, yPos, imgW, imgH); } catch(e) {}
+            yPos += imgH + 5;
+          }
+        });
+
         const options = Array.isArray(q.options) ? q.options : [];
         const isSubjective = options.length === 1 && options[0]?.isSubjective;
         
         if (isSubjective) {
-           if (yPos > 250) {
-             doc.addPage();
-             addWatermark();
-             yPos = 20;
+           yPos += 4;
+           if (yPos > 240) { doc.addPage(); addWatermark(); yPos = 20; }
+           for(let i=0; i<3; i++) {
+             doc.setDrawColor(200, 200, 200);
+             doc.line(20, yPos, 190, yPos);
+             yPos += 10;
            }
-           yPos += 8;
-           doc.setDrawColor(200, 200, 200);
-           doc.line(20, yPos, 190, yPos);
-           yPos += 10;
-           doc.line(20, yPos, 190, yPos);
-           yPos += 10;
-           doc.line(20, yPos, 190, yPos);
-           doc.setDrawColor(0, 0, 0); // reset
+           doc.setDrawColor(0, 0, 0);
         } else {
           options.forEach((opt, optIndex) => {
             const label = String.fromCharCode(65 + optIndex);
             const text = stripTokens(opt?.text || "");
-            if (text) {
-               if (yPos > 280) {
-                 doc.addPage();
-                 addWatermark();
-                 yPos = 20;
-               }
-               const splitOpt = doc.splitTextToSize(`   ${label}) ${text}`, 170);
-               doc.text(splitOpt, 14, yPos);
-               yPos += splitOpt.length * 6;
+            
+            if (yPos > 270) { doc.addPage(); addWatermark(); yPos = 20; }
+            const splitOpt = doc.splitTextToSize(`   ${label}) ${text}`, 170);
+            doc.text(splitOpt, 14, yPos);
+            yPos += splitOpt.length * 6;
+
+            if (opt.imageUrl) {
+              const img = imageCache.get(opt.imageUrl);
+              if (img) {
+                const ratio = img.width / img.height;
+                let imgW = 40;
+                let imgH = imgW / ratio;
+                if (yPos + imgH > 275) { doc.addPage(); addWatermark(); yPos = 20; }
+                try { doc.addImage(img, "JPEG", 25, yPos, imgW, imgH); } catch(e) {}
+                yPos += imgH + 4;
+              }
             }
           });
         }
-        yPos += 4; // Space between questions
+        yPos += 8; // Space between questions
       });
     }
+
     
     const nameBase = `${(test.subject || "test").replace(/\s+/g, "_")}_${(test.className || "class").replace(/\s+/g, "_")}`;
     doc.save(`${nameBase}.pdf`);
@@ -270,13 +312,23 @@ function TeacherTestsPanel({
             </label>
             <label>
               <span>Class</span>
-              <select value={testClass} onChange={(e) => setTestClass(e.target.value)}>
-                <option value="">Select class</option>
-                {classOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
+              <select 
+                value={testClass} 
+                onChange={(e) => setTestClass(e.target.value)}
+                disabled={!isAdmin && teacherClass}
+              >
+                {!isAdmin && teacherClass ? (
+                  <option value={teacherClass}>{teacherClass}</option>
+                ) : (
+                  <>
+                    <option value="">Select class</option>
+                    {classOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
             </label>
             <label>
@@ -429,6 +481,21 @@ function TeacherTestsPanel({
                               style={{ fontWeight: 700 }}
                               dangerouslySetInnerHTML={toDangerousHtml(q.questionText)}
                             />
+                            {q.imageUrl && (
+                              <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                {(Array.isArray(q.imageUrl) 
+                                  ? q.imageUrl 
+                                  : (() => { try { const p = JSON.parse(q.imageUrl); return Array.isArray(p) ? p : [q.imageUrl]; } catch { return [q.imageUrl]; } })()
+                                ).filter(Boolean).map((url, idx) => (
+                                  <img 
+                                    key={idx} 
+                                    src={url.startsWith("http") ? url : `http://localhost:5000${url}`} 
+                                    alt={`Q-${idx}`} 
+                                    style={{ height: 32, width: 32, objectFit: "cover", borderRadius: 4, border: "1px solid #e5e7eb" }} 
+                                  />
+                                ))}
+                              </div>
+                            )}
                             <div className="section-sub">
                               {q.subject} - {q.className} - {q.difficulty || "-"}
                               {q.section ? ` - ${q.section}` : ""} - {q.marks || 1} marks
@@ -455,13 +522,14 @@ function TeacherTestsPanel({
         </button>
       </div>
       {isTestsLoading ? (
-        <div className="section-sub">Loading tests...</div>
+        <div className="section-sub" style={{ padding: "20px 0" }}>Loading tests...</div>
       ) : testsError ? (
-        <div className="section-sub" style={{ color: "#c23" }}>{testsError}</div>
+        <div className="section-sub" style={{ color: "var(--danger)", padding: "20px 0" }}>{testsError}</div>
       ) : filteredTests.length === 0 ? (
-        <div className="section-sub">No tests scheduled.</div>
+        <div className="section-sub" style={{ padding: "20px 0" }}>No tests scheduled.</div>
       ) : (
-        <table className="table">
+        <div className="table-container">
+          <table className="table">
           <thead>
             <tr>
               <th>Subject</th>
@@ -517,7 +585,8 @@ function TeacherTestsPanel({
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       )}
     </div>
   );

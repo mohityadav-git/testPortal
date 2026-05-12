@@ -101,8 +101,18 @@ router.post("/teacher/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ id: teacher.Id, role: "teacher", name: teacher.TeacherName }, JWT_SECRET, { expiresIn: "24h" });
-    res.json({ message: "Login successful", token, role: "teacher", name: teacher.TeacherName });
+    const token = jwt.sign(
+      { id: teacher.Id, role: "teacher", name: teacher.TeacherName, className: teacher.ClassName || "" },
+      JWT_SECRET,
+      { expiresIn: "24h" }
+    );
+    res.json({
+      message: "Login successful",
+      token,
+      role: "teacher",
+      name: teacher.TeacherName,
+      className: teacher.ClassName || "",
+    });
   } catch (err) {
     console.error("Teacher login error", err);
     res.status(500).json({ error: "Server error" });

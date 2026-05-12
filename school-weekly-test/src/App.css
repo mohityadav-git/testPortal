@@ -687,7 +687,7 @@ a {
 
 .student-body {
   display: grid;
-  grid-template-columns: 220px 1fr 320px;
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: flex-start;
   flex: 1;
@@ -852,12 +852,12 @@ a {
 .teacher-dashboard .student-body {
   margin-top: 0;
   padding-top: 0;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 1fr;
 }
 
 .student-body {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: flex-start;
   flex: 1;

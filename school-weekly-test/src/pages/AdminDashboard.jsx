@@ -103,7 +103,7 @@ const AdminDashboard = () => {
         </button>
       </div>
 
-      <div style={{ maxWidth: "860px", margin: "40px auto", padding: "0 24px" }}>
+      <div style={{ width: "100%", margin: "20px 0", padding: "0 20px" }}>
 
         {/* Register Teacher Form */}
         <div style={{

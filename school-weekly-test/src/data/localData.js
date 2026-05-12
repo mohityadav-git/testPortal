@@ -30,61 +30,10 @@ export const subjectOptions = [
   { name: "Hindi", color: "#3e9c7a", desc: "Literature, grammar, and composition." },
 ];
 
-export const initialTests = [
-  {
-    id: "T1",
-    subject: "Mathematics",
-    className: "Class 3",
-    date: "2025-12-10",
-    time: "09:00",
-    durationMinutes: 30,
-    status: "Scheduled",
-  },
-  {
-    id: "T2",
-    subject: "Science",
-    className: "Class 5",
-    date: "2025-12-12",
-    time: "11:00",
-    durationMinutes: 40,
-    status: "Scheduled",
-  },
-];
+export const initialTests = [];
 
 // Student dashboard sample tests
-export const studentMockTests = [
-  {
-    id: "T1",
-    subject: "Mathematics",
-    className: "8A",
-    date: "2025-12-10",
-    time: "09:00",
-    durationMinutes: 30,
-    status: "Scheduled",
-  },
-  {
-    id: "T2",
-    subject: "Science",
-    className: "8A",
-    date: "2025-12-05",
-    time: "10:00",
-    durationMinutes: 40,
-    status: "Completed",
-    score: 18,
-    outOf: 20,
-  },
-  {
-    id: "T3",
-    subject: "English",
-    className: "8A",
-    date: "2025-11-28",
-    time: "11:00",
-    durationMinutes: 30,
-    status: "Completed",
-    score: 15,
-    outOf: 20,
-  },
-];
+export const studentMockTests = [];
 
 // Test attempt fallback questions
 export const fallbackQuestions = [];

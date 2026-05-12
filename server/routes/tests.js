@@ -1,12 +1,25 @@
 const express = require("express");
 const router = express.Router();
 const { sql, getPool } = require("../config/db");
+const { verifyToken } = require("../utils/authMiddleware");
 
 /* ---------------- GET all tests ---------------- */
-router.get("/", async (req, res) => {
+router.get("/", verifyToken, async (req, res) => {
+  let teacherClass = null;
+  if (req.user?.role === "teacher") {
+    teacherClass = req.user.className || "";
+    if (!teacherClass) {
+      try {
+        const pool = await getPool();
+        const r = await pool.request().input("Id", sql.Int, req.user.id).query("SELECT ClassName FROM Teachers WHERE Id = @Id");
+        teacherClass = r.recordset[0]?.ClassName || "";
+      } catch {}
+    }
+    if (!teacherClass) teacherClass = null; // no class assigned = show nothing restricted
+  }
   try {
     const pool = await getPool();
-    const result = await pool.request().query(`
+    const query = `
       SELECT
         Id, Subject, ClassName, SubjectsJson, QuestionIdsJson,
         Date, Time, StartAt, EndAt, LinkExpiresAt,
@@ -14,7 +27,11 @@ router.get("/", async (req, res) => {
         ShuffleQuestions, ShuffleOptions,
         Type, Difficulty, Status
       FROM Tests
-    `);
+      ${teacherClass ? "WHERE LOWER(ClassName) = LOWER(@ClassName)" : ""}
+    `;
+    const request = pool.request();
+    if (teacherClass) request.input("ClassName", sql.NVarChar(50), teacherClass);
+    const result = await request.query(query);
 
     const mapped = (result.recordset || []).map((row) => {
       let subjects = [];
@@ -60,7 +77,7 @@ router.get("/", async (req, res) => {
 });
 
 /* ---------------- CREATE test ---------------- */
-router.post("/", async (req, res) => {
+router.post("/", verifyToken, async (req, res) => {
   const {
     subject,
     className,
@@ -81,9 +98,14 @@ router.post("/", async (req, res) => {
   } = req.body || {};
 
   if (!subject || !className || !date || !time) {
-    return res
-      .status(400)
-      .json({ error: "subject, className, date, time are required" });
+    return res.status(400).json({ error: "subject, className, date, time are required" });
+  }
+
+  // Teachers can only create tests for their own class
+  if (req.user?.role === "teacher" && req.user.className) {
+    if (req.user.className.toLowerCase() !== className.toLowerCase()) {
+      return res.status(403).json({ error: "You can only create tests for your assigned class" });
+    }
   }
 
   const subjectsJson =

@@ -2,5 +2,11 @@
 **/build/
 **/.env
 **/.env.*
+!**/.env.example
+
+# React build copied into server for production serving
+server/public/
+
+# Uploaded files (persisted on server, not in git)
 server/uploads/*
 !server/uploads/.gitkeep

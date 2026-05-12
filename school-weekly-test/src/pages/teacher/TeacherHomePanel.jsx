@@ -12,6 +12,7 @@ function TeacherHomePanel({
   activePanel,
   openTestsPanel,
   setActivePanel,
+  isAdmin,
 }) {
   return (
     <>
@@ -40,31 +41,6 @@ function TeacherHomePanel({
             </div>
           </div>
         </div>
-        <div className="hero-panel">
-          <div className="panel-label">Next test</div>
-          <div className="panel-bubble">
-            <div className="bubble-icon" aria-hidden="true">T</div>
-            <div>
-              <div className="bubble-title">Upcoming</div>
-              <div className="bubble-sub">
-                {nextTest
-                  ? `${nextTest.subject} - ${nextTest.date} ${nextTest.time}`
-                  : "No tests scheduled"}
-              </div>
-            </div>
-          </div>
-          <div className="panel-bubble">
-            <div className="bubble-icon" aria-hidden="true">R</div>
-            <div>
-              <div className="bubble-title">Latest result</div>
-              <div className="bubble-sub">
-                {filteredResults[0]
-                  ? `${filteredResults[0].studentName} - ${filteredResults[0].subject}`
-                  : "No results yet"}
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div className="card teacher-action-card">
@@ -79,14 +55,42 @@ function TeacherHomePanel({
           <button
             type="button"
             className={`action-tile ${activePanel === "tests" ? "active" : ""}`}
-            onClick={() => openTestsPanel(false)}
+            onClick={() => openTestsPanel(true)}
           >
-            <span className="tile-icon upcoming" aria-hidden="true">S</span>
+            <span className="tile-icon results" aria-hidden="true">P</span>
             <div className="tile-body">
-              <div className="tile-title">Schedule test</div>
-              <div className="tile-sub">Plan the next exam</div>
+              <div className="tile-title">Past Tests</div>
+              <div className="tile-sub">Completed exams</div>
             </div>
-            <span className="tile-chip">{filteredTests.length}</span>
+            <span className="tile-chip">
+              {filteredTests.filter((t) => {
+                const testDate = new Date(t.date);
+                testDate.setHours(0, 0, 0, 0);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                return testDate < today;
+              }).length}
+            </span>
+          </button>
+          <button
+            type="button"
+            className={`action-tile ${activePanel === "tests" ? "active" : ""}`}
+            onClick={() => openTestsPanel(true)}
+          >
+            <span className="tile-icon upcoming" aria-hidden="true">C</span>
+            <div className="tile-body">
+              <div className="tile-title">Current Test</div>
+              <div className="tile-sub">Live &amp; scheduled</div>
+            </div>
+            <span className="tile-chip">
+              {filteredTests.filter((t) => {
+                const testDate = new Date(t.date);
+                testDate.setHours(0, 0, 0, 0);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                return testDate >= today;
+              }).length}
+            </span>
           </button>
           <button
             type="button"
@@ -126,18 +130,35 @@ function TeacherHomePanel({
             <span className="tile-chip">{filteredResults.length}</span>
           </button>
 
-          <button
-            type="button"
-            className={`action-tile ${activePanel === "students" ? "active" : ""}`}
-            onClick={() => setActivePanel("students")}
-          >
-            <span className="tile-icon upcoming" aria-hidden="true">S</span>
-            <div className="tile-body">
-              <div className="tile-title">Students</div>
-              <div className="tile-sub">Class roster</div>
-            </div>
-            <span className="tile-chip">{students.length}</span>
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              className={`action-tile ${activePanel === "students" ? "active" : ""}`}
+              onClick={() => setActivePanel("students")}
+            >
+              <span className="tile-icon upcoming" aria-hidden="true">S</span>
+              <div className="tile-body">
+                <div className="tile-title">Students</div>
+                <div className="tile-sub">Class roster</div>
+              </div>
+              <span className="tile-chip">{students.length}</span>
+            </button>
+          )}
+
+          {!isAdmin && (
+            <button
+              type="button"
+              className={`action-tile ${activePanel === "classroom" ? "active" : ""}`}
+              onClick={() => setActivePanel("classroom")}
+            >
+              <span className="tile-icon upcoming" aria-hidden="true">🏫</span>
+              <div className="tile-body">
+                <div className="tile-title">Classroom</div>
+                <div className="tile-sub">Your class students</div>
+              </div>
+              <span className="tile-chip">{students.length}</span>
+            </button>
+          )}
         </div>
       </div>
     </>

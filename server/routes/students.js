@@ -2,13 +2,30 @@ const express = require("express");
 const router = express.Router();
 const { sql, getPool } = require("../config/db");
 const bcrypt = require("bcryptjs");
+const { verifyToken } = require("../utils/authMiddleware");
 
 /* ---------------- GET students ---------------- */
-router.get("/", async (req, res) => {
-  const { className, rollNumber, studentName } = req.query || {};
+router.get("/", verifyToken, async (req, res) => {
+  let { className, rollNumber, studentName } = req.query || {};
+
+  // Teachers can only see students from their own class
+  if (req.user?.role === "teacher") {
+    let teacherClassName = req.user.className || "";
+    // If className not in token (old sessions), look it up from DB
+    if (!teacherClassName) {
+      try {
+        const pool = await getPool();
+        const result = await pool.request()
+          .input("Id", sql.Int, req.user.id)
+          .query("SELECT ClassName FROM Teachers WHERE Id = @Id");
+        teacherClassName = result.recordset[0]?.ClassName || "";
+      } catch {}
+    }
+    if (teacherClassName) className = teacherClassName;
+  }
 
   let query =
-    "SELECT Id, StudentName, ClassName, RollNumber, MobileNumber, CreatedAt FROM Students";
+    "SELECT Id, StudentName, ClassName, RollNumber, MobileNumber, CreatedAt, CASE WHEN PasswordHash IS NOT NULL THEN 1 ELSE 0 END AS HasPassword FROM Students";
 
   const filters = [];
   if (className) filters.push("LOWER(ClassName) = LOWER(@ClassName)");
@@ -45,6 +62,20 @@ router.post("/", async (req, res) => {
 
   try {
     const pool = await getPool();
+
+    // Check if roll number is unique within the class
+    if (rollNumber) {
+      const checkResult = await pool
+        .request()
+        .input("ClassName", sql.NVarChar(50), className)
+        .input("RollNumber", sql.NVarChar(50), rollNumber)
+        .query(`SELECT Id FROM Students WHERE ClassName = @ClassName AND RollNumber = @RollNumber`);
+
+      if (checkResult.recordset.length > 0) {
+        return res.status(400).json({ error: `Roll number ${rollNumber} already exists in ${className}` });
+      }
+    }
+
     const result = await pool
       .request()
       .input("StudentName", sql.NVarChar(200), studentName)
@@ -72,31 +103,51 @@ router.patch("/:id", async (req, res) => {
   const { id } = req.params;
   const { studentName, rollNumber, mobileNumber } = req.body || {};
 
-  const updates = [];
-  if (studentName !== undefined) updates.push("StudentName = @StudentName");
-  if (rollNumber !== undefined) updates.push("RollNumber = @RollNumber");
-  if (mobileNumber !== undefined) updates.push("MobileNumber = @MobileNumber");
-
-  if (!updates.length) {
-    return res
-      .status(400)
-      .json({ error: "No updatable fields provided" });
-  }
-
   try {
     const pool = await getPool();
+
+    // If rollNumber is changing, check for uniqueness within the student's class
+    if (rollNumber !== undefined && rollNumber !== null) {
+      const studentInfo = await pool.request()
+        .input("Id", sql.Int, id)
+        .query("SELECT ClassName FROM Students WHERE Id = @Id");
+      
+      const className = studentInfo.recordset[0]?.ClassName;
+      if (className) {
+        const checkResult = await pool
+          .request()
+          .input("Id", sql.Int, id)
+          .input("ClassName", sql.NVarChar(50), className)
+          .input("RollNumber", sql.NVarChar(50), rollNumber)
+          .query(`SELECT Id FROM Students WHERE ClassName = @ClassName AND RollNumber = @RollNumber AND Id <> @Id`);
+
+        if (checkResult.recordset.length > 0) {
+          return res.status(400).json({ error: `Roll number ${rollNumber} already exists in ${className}` });
+        }
+      }
+    }
+
+    const updates = [];
     const request = pool.request().input("Id", sql.Int, Number(id));
 
-    if (studentName !== undefined)
+    if (studentName !== undefined) {
+      updates.push("StudentName = @StudentName");
       request.input("StudentName", sql.NVarChar(200), studentName);
-    if (rollNumber !== undefined)
+    }
+    if (rollNumber !== undefined) {
+      updates.push("RollNumber = @RollNumber");
       request.input("RollNumber", sql.NVarChar(50), rollNumber || null);
-    if (mobileNumber !== undefined)
+    }
+    if (mobileNumber !== undefined) {
+      updates.push("MobileNumber = @MobileNumber");
       request.input("MobileNumber", sql.NVarChar(20), mobileNumber || null);
+    }
 
-    await request.query(
-      `UPDATE Students SET ${updates.join(", ")} WHERE Id = @Id`
-    );
+    if (!updates.length) {
+      return res.status(400).json({ error: "No updatable fields provided" });
+    }
+
+    await request.query(`UPDATE Students SET ${updates.join(", ")} WHERE Id = @Id`);
 
     res.json({ message: "Student updated" });
   } catch (err) {

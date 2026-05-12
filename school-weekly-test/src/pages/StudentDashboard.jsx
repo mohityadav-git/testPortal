@@ -327,18 +327,17 @@ function StudentDashboard() {
       <header
         className="dashboard-nav"
         style={{
-          display: "grid",
-          gridTemplateColumns: "auto 1fr auto",
+          display: "flex",
+          justifyContent: "space-between",
           alignItems: "center",
-          padding: "10px 16px",
-          background: "#f5f7fb",
-          border: "1px solid #e5e7eb",
-          borderRadius: 12,
-          marginBottom: 12,
+          padding: isNarrow ? "12px 16px" : "16px 24px",
+          background: "#ffffff",
+          borderBottom: "1px solid #e2e8f0",
           position: "sticky",
           top: 0,
-          zIndex: 40,
+          zIndex: 100,
           width: "100%",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -466,37 +465,7 @@ function StudentDashboard() {
         </div>
       </header>
 
-      <div className="student-body">
-        <aside className="side-menu">
-          <div className="side-menu-heading">Main</div>
-          <nav className="side-menu-list">
-            <button
-              className={`link-btn side-menu-btn ${activePanel === "home" ? "active" : ""}`}
-              onClick={() => setActivePanel("home")}
-            >
-              Home
-            </button>
-            <button className={`link-btn side-menu-btn ${activePanel === "upcoming" ? "active" : ""}`} onClick={() => setActivePanel("upcoming")}>
-              Upcoming Tests
-            </button>
-            <button className={`link-btn side-menu-btn ${activePanel === "past" ? "active" : ""}`} onClick={() => setActivePanel("past")}>
-              Past Results
-            </button>
-
-          </nav>
-          <div className="side-menu-heading" style={{ marginTop: 10 }}>
-            Other
-          </div>
-          <nav className="side-menu-list">
-            <button className="link-btn side-menu-btn" onClick={() => alert("Settings coming soon")}>
-              Settings
-            </button>
-            <button className="link-btn side-menu-btn" onClick={() => alert("Help coming soon")}>
-              Help
-            </button>
-          </nav>
-        </aside>
-
+      <div className="student-body" style={{ padding: isNarrow ? "16px" : "24px", width: "100%" }}>
         <div style={{ minWidth: 0 }}>
           {activePanel === "home" && (
             <StudentHomePanel

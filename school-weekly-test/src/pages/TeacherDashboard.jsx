@@ -13,13 +13,14 @@ import TeacherResultsPanel from "./teacher/TeacherResultsPanel";
 import TeacherPerformancePanel from "./teacher/TeacherPerformancePanel";
 import TeacherStudentsPanel from "./teacher/TeacherStudentsPanel";
 import AdminTeachersPanel from "./teacher/AdminTeachersPanel";
+import TeacherClassroomPanel from "./teacher/TeacherClassroomPanel";
 
 
 function TeacherDashboard({ isAdmin = false }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const teacherClass = useMemo(() => (user?.className || "").trim(), [user]);
-  const [activePanel, setActivePanel] = useState("home");
+  const [activePanel, setActivePanel] = useState(isAdmin ? "teachers" : "home");
   const [isNarrow, setIsNarrow] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
@@ -84,6 +85,7 @@ function TeacherDashboard({ isAdmin = false }) {
   const [materialClass, setMaterialClass] = useState("");
   const [materialFile, setMaterialFile] = useState(null);
   const [materialFileKey, setMaterialFileKey] = useState(0);
+  const [studentClass, setStudentClass] = useState(isAdmin ? "Class 1" : "");
   const [studentName, setStudentName] = useState("");
   const [studentRollNumber, setStudentRollNumber] = useState("");
   const [studentMobileNumber, setStudentMobileNumber] = useState("");
@@ -104,6 +106,7 @@ function TeacherDashboard({ isAdmin = false }) {
       setTestClass(teacherClass);
       setQuestionClass(teacherClass);
       setMaterialClass(teacherClass);
+      setStudentClass(teacherClass);
     }
   }, [teacherClass]);
 
@@ -215,10 +218,19 @@ function TeacherDashboard({ isAdmin = false }) {
     }
   };
 
-  const loadStudents = async () => {
+  const loadStudents = async (filterClass) => {
     setIsStudentsLoading(true);
+    const targetClass = typeof filterClass === "string" ? filterClass : null;
     try {
-      const params = teacherClass ? { className: teacherClass } : {};
+      const params = {};
+      if (isAdmin) {
+        // Admin: only filter if a specific class string is provided
+        if (targetClass) params.className = targetClass;
+      } else {
+        // Teacher: always filter by their assigned class
+        if (teacherClass) params.className = teacherClass;
+      }
+      
       const data = await api.getStudents(params);
       setStudents(Array.isArray(data) ? data : []);
       setStudentsError(null);
@@ -243,6 +255,11 @@ function TeacherDashboard({ isAdmin = false }) {
 
   useEffect(() => {
     if (activePanel !== "students") return;
+    loadStudents(); // admin: no filter = all classes; teacher: filtered by JWT class
+  }, [activePanel, teacherClass]);
+
+  useEffect(() => {
+    if (activePanel !== "classroom") return;
     loadStudents();
   }, [activePanel, teacherClass]);
 
@@ -718,14 +735,14 @@ function TeacherDashboard({ isAdmin = false }) {
 
   const handleAddStudent = async (e) => {
     e.preventDefault();
-    if (!studentName || !teacherClass) {
+    if (!studentName || !(studentClass || teacherClass)) {
       setStudentsError("Student name and class are required");
       return;
     }
     try {
       await api.createStudent({
         studentName: studentName.trim(),
-        className: teacherClass,
+        className: studentClass || teacherClass,
         rollNumber: studentRollNumber.trim() || null,
         mobileNumber: studentMobileNumber.trim() || null,
       });
@@ -736,7 +753,9 @@ function TeacherDashboard({ isAdmin = false }) {
       loadStudents();
     } catch (err) {
       console.warn("Create student failed", err?.message);
-      setStudentsError("Could not add student");
+      let msg = err.message || "Could not add student";
+      try { const parsed = JSON.parse(msg); if(parsed.error) msg = parsed.error; } catch(e) {}
+      setStudentsError(msg);
     }
   };
 
@@ -779,7 +798,9 @@ function TeacherDashboard({ isAdmin = false }) {
       setStudentsError(null);
     } catch (err) {
       console.warn("Update student failed", err?.message);
-      setStudentsError("Could not update student");
+      let msg = err.message || "Could not update student";
+      try { const parsed = JSON.parse(msg); if(parsed.error) msg = parsed.error; } catch(e) {}
+      setStudentsError(msg);
     }
   };
 
@@ -846,18 +867,17 @@ function TeacherDashboard({ isAdmin = false }) {
       <header
         className="dashboard-nav"
         style={{
-          display: "grid",
-          gridTemplateColumns: "auto 1fr auto",
+          display: "flex",
+          justifyContent: "space-between",
           alignItems: "center",
-          padding: "8px 16px",
-          background: "#f5f7fb",
-          border: "1px solid #e5e7eb",
-          borderRadius: 12,
-          marginBottom: 0,
+          padding: isNarrow ? "12px 16px" : "16px 24px",
+          background: "#ffffff",
+          borderBottom: "1px solid #e2e8f0",
           position: "sticky",
           top: 0,
-          zIndex: 40,
+          zIndex: 100,
           width: "100%",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -889,46 +909,60 @@ function TeacherDashboard({ isAdmin = false }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative", justifyContent: "center" }}>
           {!isNarrow && (
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                style={navButtonStyle(activePanel === "home")}
-                onClick={() => setActivePanel("home")}
-              >
-                Home
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                style={navButtonStyle(activePanel === "tests")}
-                onClick={() => openTestsPanel(true)}
-              >
-                Tests
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                style={navButtonStyle(activePanel === "questions")}
-                onClick={() => setActivePanel("questions")}
-              >
-                Questions
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                style={navButtonStyle(activePanel === "results")}
-                onClick={() => setActivePanel("results")}
-              >
-                Results
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                style={navButtonStyle(activePanel === "students")}
-                onClick={() => setActivePanel("students")}
-              >
-                Students
-              </button>
+              {!isAdmin && (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    style={navButtonStyle(activePanel === "home")}
+                    onClick={() => setActivePanel("home")}
+                  >
+                    Home
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    style={navButtonStyle(activePanel === "tests")}
+                    onClick={() => openTestsPanel(true)}
+                  >
+                    Tests
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    style={navButtonStyle(activePanel === "questions")}
+                    onClick={() => setActivePanel("questions")}
+                  >
+                    Questions
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    style={navButtonStyle(activePanel === "results")}
+                    onClick={() => setActivePanel("results")}
+                  >
+                    Results
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    style={navButtonStyle(activePanel === "classroom")}
+                    onClick={() => setActivePanel("classroom")}
+                  >
+                    🏫 Classroom
+                  </button>
+                </>
+              )}
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  style={navButtonStyle(activePanel === "students")}
+                  onClick={() => setActivePanel("students")}
+                >
+                  Students
+                </button>
+              )}
               {isAdmin && (
                 <button
                   type="button"
@@ -971,56 +1005,62 @@ function TeacherDashboard({ isAdmin = false }) {
                 minWidth: 160,
               }}
             >
-              <button
-                type="button"
-                className="link-btn side-menu-btn"
-                onClick={() => {
-                  setActivePanel("home");
-                  setShowMenu(false);
-                }}
-              >
-                Home
-              </button>
-              <button
-                type="button"
-                className="link-btn side-menu-btn"
-                onClick={() => {
-                  openTestsPanel(true);
-                  setShowMenu(false);
-                }}
-              >
-                Tests
-              </button>
-              <button
-                type="button"
-                className="link-btn side-menu-btn"
-                onClick={() => {
-                  setActivePanel("questions");
-                  setShowMenu(false);
-                }}
-              >
-                Questions
-              </button>
-              <button
-                type="button"
-                className="link-btn side-menu-btn"
-                onClick={() => {
-                  setActivePanel("results");
-                  setShowMenu(false);
-                }}
-              >
-                Results
-              </button>
-              <button
-                type="button"
-                className="link-btn side-menu-btn"
-                onClick={() => {
-                  setActivePanel("students");
-                  setShowMenu(false);
-                }}
-              >
-                Students
-              </button>
+              {!isAdmin && (
+                <>
+                  <button
+                    type="button"
+                    className="link-btn side-menu-btn"
+                    onClick={() => {
+                      setActivePanel("home");
+                      setShowMenu(false);
+                    }}
+                  >
+                    Home
+                  </button>
+                  <button
+                    type="button"
+                    className="link-btn side-menu-btn"
+                    onClick={() => {
+                      openTestsPanel(true);
+                      setShowMenu(false);
+                    }}
+                  >
+                    Tests
+                  </button>
+                  <button
+                    type="button"
+                    className="link-btn side-menu-btn"
+                    onClick={() => {
+                      setActivePanel("questions");
+                      setShowMenu(false);
+                    }}
+                  >
+                    Questions
+                  </button>
+                  <button
+                    type="button"
+                    className="link-btn side-menu-btn"
+                    onClick={() => {
+                      setActivePanel("results");
+                      setShowMenu(false);
+                    }}
+                  >
+                    Results
+                  </button>
+                </>
+              )}
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="link-btn side-menu-btn"
+                  onClick={() => {
+                    setActivePanel("students");
+                    setShowMenu(false);
+                  }}
+                >
+                  Students
+                </button>
+              )}
               {isAdmin && (
                 <button
                   type="button"
@@ -1041,62 +1081,7 @@ function TeacherDashboard({ isAdmin = false }) {
         </div>
       </header>
 
-      <div className="student-body">
-        <aside className="side-menu">
-          <div className="side-menu-heading">Main</div>
-          <nav className="side-menu-list">
-            <button
-              className={`link-btn side-menu-btn ${activePanel === "home" ? "active" : ""}`}
-              onClick={() => setActivePanel("home")}
-            >
-              Home
-            </button>
-            <button
-              className={`link-btn side-menu-btn ${activePanel === "tests" ? "active" : ""}`}
-              onClick={() => openTestsPanel(true)}
-            >
-              Tests
-            </button>
-            <button
-              className={`link-btn side-menu-btn ${activePanel === "questions" ? "active" : ""}`}
-              onClick={() => setActivePanel("questions")}
-            >
-              Questions
-            </button>
-            <button
-              className={`link-btn side-menu-btn ${activePanel === "results" ? "active" : ""}`}
-              onClick={() => setActivePanel("results")}
-            >
-              Results
-            </button>
-            <button
-              className={`link-btn side-menu-btn ${activePanel === "students" ? "active" : ""}`}
-              onClick={() => setActivePanel("students")}
-            >
-              Students
-            </button>
-            {isAdmin && (
-              <button
-                className={`link-btn side-menu-btn ${activePanel === "teachers" ? "active" : ""}`}
-                onClick={() => setActivePanel("teachers")}
-              >
-                👤 Teachers
-              </button>
-            )}
-          </nav>
-          <div className="side-menu-heading" style={{ marginTop: 10 }}>
-            Other
-          </div>
-          <nav className="side-menu-list">
-            <button className="link-btn side-menu-btn" onClick={() => alert("Settings coming soon")}>
-              Settings
-            </button>
-            <button className="link-btn side-menu-btn" onClick={() => alert("Help coming soon")}>
-              Help
-            </button>
-          </nav>
-        </aside>
-
+      <div className="student-body" style={{ padding: isNarrow ? "16px" : "24px", width: "100%" }}>
         <div style={{ minWidth: 0 }}>
           {activePanel === "home" && (
             <TeacherHomePanel
@@ -1111,6 +1096,7 @@ function TeacherDashboard({ isAdmin = false }) {
               activePanel={activePanel}
               openTestsPanel={openTestsPanel}
               setActivePanel={setActivePanel}
+              isAdmin={isAdmin}
             />
           )}
           {activePanel === "tests" && (
@@ -1143,6 +1129,9 @@ function TeacherDashboard({ isAdmin = false }) {
               testsError={testsError}
               filteredTests={filteredTests}
               handleDeleteTest={handleDeleteTest}
+              isAdmin={isAdmin}
+              teacherClass={teacherClass}
+
             />
           )}
           {activePanel === "questions" && (
@@ -1184,6 +1173,9 @@ function TeacherDashboard({ isAdmin = false }) {
               loadQuestions={loadQuestions}
               isQuestionsLoading={isQuestionsLoading}
               questionsError={questionsError}
+              isAdmin={isAdmin}
+              teacherClass={teacherClass}
+
               filteredQuestions={filteredQuestions}
               handleDeleteQuestion={handleDeleteQuestion}
               startEditQuestion={startEditQuestion}
@@ -1196,6 +1188,7 @@ function TeacherDashboard({ isAdmin = false }) {
               isResultsLoading={isResultsLoading}
               resultsError={resultsError}
               filteredResults={filteredResults}
+              filteredTests={filteredTests}
               selectedResult={selectedResult}
               setSelectedResult={setSelectedResult}
               loadResults={loadResults}
@@ -1203,8 +1196,11 @@ function TeacherDashboard({ isAdmin = false }) {
             />
           )}
 
-          {activePanel === "students" && (
+          {isAdmin && activePanel === "students" && (
             <TeacherStudentsPanel
+              isAdmin={isAdmin}
+              studentClass={studentClass}
+              setStudentClass={setStudentClass}
               studentName={studentName}
               setStudentName={setStudentName}
               studentRollNumber={studentRollNumber}
@@ -1232,6 +1228,16 @@ function TeacherDashboard({ isAdmin = false }) {
           )}
           {activePanel === "teachers" && isAdmin && (
             <AdminTeachersPanel />
+          )}
+          {!isAdmin && activePanel === "classroom" && (
+            <TeacherClassroomPanel
+              students={students}
+              isStudentsLoading={isStudentsLoading}
+              loadStudents={loadStudents}
+              teacherClass={teacherClass}
+              tests={filteredTests}
+              results={filteredResults}
+            />
           )}
         </div>
 

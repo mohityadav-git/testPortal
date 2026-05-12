@@ -31,8 +31,8 @@ function StudentPastResultsPanel({
               const isCorrect = ans.selectedIndex === ans.correctIndex;
               
               const optionImageStyle = {
-                width: 100,
-                height: 100,
+                maxWidth: "100%",
+                maxHeight: 120,
                 objectFit: "contain",
                 borderRadius: 8,
                 border: "1px solid #e5e7eb",
@@ -108,7 +108,7 @@ function StudentPastResultsPanel({
       {pastTests.length === 0 ? (
         <p>No past test records yet.</p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
+        <div className="table-container">
           <table className="table">
             <thead>
               <tr>

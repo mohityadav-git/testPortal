@@ -1,15 +1,12 @@
 const subjectOptions = [
   "All Subjects",
   "Mathematics",
-  "Maths",
   "Science",
   "Physics",
   "Chemistry",
   "Biology",
   "Zoology",
   "English",
-  "English Grammer",
-  "English Language",
   "Home Science",
   "Social Studies",
   "Computer Science",
@@ -27,11 +24,6 @@ const subjectOptions = [
   "Sanskrit",
   "Physiology",
   "Art",
-  "Education",
-  "Diffence",
-  "Technical",
-  "Artificial Inteligence",
-  "Entrepreneours",
 ];
 
 const classOptions = [

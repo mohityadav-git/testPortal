@@ -564,16 +564,16 @@ function TestAttempt() {
   const currentDisplayNumber = currentIndex + 1;
   const currentType = currentQuestion?.type || testMeta?.type || "Objective";
   const optionImageStyle = {
-    width: 180,
-    height: 180,
+    maxWidth: "100%",
+    maxHeight: 180,
     objectFit: "contain",
     borderRadius: 8,
     border: "1px solid #e5e7eb",
     background: "#fff",
   };
   const questionImageStyle = {
-    width: 360,
-    height: 360,
+    maxWidth: "100%",
+    maxHeight: 360,
     objectFit: "contain",
     borderRadius: 12,
     border: "1px solid #e5e7eb",

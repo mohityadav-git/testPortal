@@ -121,5 +121,8 @@ export const api = {
   // Teachers endpoints
   getTeachers: () => request("/teachers"),
   createTeacher: (payload) => request("/teachers", { method: "POST", body: JSON.stringify(payload) }),
+  updateTeacher: (id, payload) => request(`/teachers/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   deleteTeacher: (id) => request(`/teachers/${id}`, { method: "DELETE" }),
+  setTeacherPassword: (id, password) =>
+    request(`/teachers/${id}/set-password`, { method: "PATCH", body: JSON.stringify({ password }) }),
 };

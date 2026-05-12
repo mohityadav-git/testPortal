@@ -14,9 +14,33 @@ const teachersRouter = require("./routes/teachers");
 const path = require("path");
 
 const app = express();
-app.use(cors());
+
+// CORS: allow localhost in dev, production domain in prod
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://mddmcollege.com",
+  "https://www.mddmcollege.com",
+];
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
+
+// Serve uploaded files (question images, study materials)
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Serve React production build (populated by running npm run build in school-weekly-test/)
+const buildPath = path.join(__dirname, "public");
+app.use(express.static(buildPath));
 
 app.get("/health", async (_req, res) => {
   try {
@@ -126,6 +150,7 @@ const ensureSchema = async () => {
         )
       `
     );
+    await ensureColumn("Teachers", "ClassName", "NVARCHAR(50) NULL");
     
     await ensureTable(
       "Admins",
@@ -144,6 +169,12 @@ const ensureSchema = async () => {
 };
 
 ensureSchema();
+
+// Catch-all: serve React app for any route not matched by the API
+// This MUST be after all API routes
+app.get("*", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => {

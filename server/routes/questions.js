@@ -1,10 +1,24 @@
 const express = require("express");
 const router = express.Router();
 const { sql, getPool } = require("../config/db");
+const { verifyToken } = require("../utils/authMiddleware");
 
 /* ---------------- GET questions ---------------- */
-router.get("/", async (req, res) => {
-  const { subject, className, ids } = req.query;
+router.get("/", verifyToken, async (req, res) => {
+  let { subject, className, ids } = req.query;
+
+  // Teachers can only see questions for their assigned class
+  if (req.user?.role === "teacher") {
+    let tc = req.user.className || "";
+    if (!tc) {
+      try {
+        const pool = await getPool();
+        const r = await pool.request().input("Id", sql.Int, req.user.id).query("SELECT ClassName FROM Teachers WHERE Id = @Id");
+        tc = r.recordset[0]?.ClassName || "";
+      } catch {}
+    }
+    if (tc) className = tc;
+  }
 
   let query =
     "SELECT Id, Subject, ClassName, QuestionText, Section, Marks, OptionsJson, CorrectIndex, Difficulty, ImageUrl FROM Questions";
@@ -75,7 +89,7 @@ router.get("/", async (req, res) => {
 });
 
 /* ---------------- CREATE question ---------------- */
-router.post("/", async (req, res) => {
+router.post("/", verifyToken, async (req, res) => {
   const {
     subject,
     className,
@@ -89,9 +103,14 @@ router.post("/", async (req, res) => {
   } = req.body || {};
 
   if (!subject || !className || !questionText) {
-    return res
-      .status(400)
-      .json({ error: "subject, className, questionText are required" });
+    return res.status(400).json({ error: "subject, className, questionText are required" });
+  }
+
+  // Teachers can only add questions for their own class
+  if (req.user?.role === "teacher" && req.user.className) {
+    if (req.user.className.toLowerCase() !== className.toLowerCase()) {
+      return res.status(403).json({ error: "You can only add questions for your assigned class" });
+    }
   }
 
   const optionsJson =
